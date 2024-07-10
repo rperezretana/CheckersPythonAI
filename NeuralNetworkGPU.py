@@ -117,9 +117,3 @@ class NeuralNetworkMultiGPU:
                 loss = cp.mean(cp.square(y - self.forward(X)))
                 print(f'Epoch {epoch}, Loss: {loss}')
 
-# Example usage
-# Define the neural network architecture with 64 input neurons, two hidden layers with 128 and 64 neurons, and 1 output neuron
-#nn = NeuralNetworkMultiGPU([64, 128, 64, 1])
-# Assuming X_train and y_train are your training data
-# Train the network with the training data for 1000 epochs and a learning rate of 0.01
-#nn.train(X_train, y_train, epochs=1000, learning_rate=0.01)
