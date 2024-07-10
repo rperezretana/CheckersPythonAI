@@ -280,6 +280,56 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual(self.game.player1_score, 11, "Player 1's score should be updated to reflect the capture.")
         self.assertEqual(self.game.player2_score, 11, "Player -1's score should be updated to reflect the remaining pieces.")
 
+    def test_diagonal_multiple_jumps(self):
+        """
+        There exist scenarios where multiple jumps over multiple tiles in checkers are valid, for instance,
+        a crown at the (7, 0 ) and then enemies in a diagonal such in (6, 1) and (4, 3) and (2, 5)
+        a jump to (1, 6) should be valid.
+        """
+        self.game.board = np.array([
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],  # (1, 6) should be valid
+            [3, 0, 3, 0, 3, -1, 3, 0], # (2, 5) enemy tile
+            [0, 3, 0, 3, 0, 3, 0, 3],  # (3, 4) should be open
+            [3, 0, 3, -1, 3, 0, 3, 0], # (4, 3) player -1
+            [0, 3, 0, 3, 0, 3, 0, 3],  # (5, 2) should be open
+            [3, -1, 3, 0, 3, 0, 3, 0], # (6, 1) player -1
+            [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown 
+        ])
+        
+        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        
+        # Ensure there are valid moves
+        self.assertGreater(len(valid_moves), 0, "There should be at least one valid move for player 1.")
+        
+        # Check if the valid moves include the correct multiple capture moves
+        capture_move_found = any(
+            (move.reshape((8, 8))[1, 6] == 2 and move.reshape((8, 8))[2, 5] == 0 and move.reshape((8, 8))[4, 3] == 0 and move.reshape((8, 8))[6, 1] == 0)
+            for move in valid_moves
+        )
+        self.assertTrue(capture_move_found, "The multiple jump capture move should be included in valid moves.")
+
+        # Apply the first valid capture move
+        chosen_move = valid_moves[0]
+        self.game.get_move_positions(self.game.board, chosen_move.reshape((8, 8)))
+        self.game.board = chosen_move.reshape((8, 8))
+        self.game.update_game_scores()
+        self.game.print_board()
+
+        # Check if the captured pieces are removed
+        self.assertEqual(self.game.board[2, 5], 0, "The first captured piece should be removed.")
+        self.assertEqual(self.game.board[4, 3], 0, "The second captured piece should be removed.")
+        self.assertEqual(self.game.board[6, 1], 0, "The third captured piece should be removed.")
+        self.assertEqual(self.game.board[7, 0], 0, "The piece was moved.")
+        self.assertEqual(self.game.board[1, 6], 2, "The player's piece should move to the capture position.")
+
+        # Check if the score is updated correctly
+        self.assertEqual(self.game.player1_score, 11, "Player 1's score should be updated to reflect the capture.")
+        self.assertEqual(self.game.player2_score, 9, "Player -1's score should be updated to reflect the remaining pieces.")
+
+        
+
+
     def test_generate_valid_moves_capture_crown_by_not_crown(self):
         self.game.board = np.array([
             [3, 0, 3, 0, 3, 0, 3, 0],
@@ -320,6 +370,5 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual(self.game.player2_score, 12, "Player -1's score should be 12, since 1 has no pieces.")
 
 
-    
 if __name__ == "__main__":
     unittest.main()
