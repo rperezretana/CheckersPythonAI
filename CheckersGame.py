@@ -7,6 +7,7 @@ from NeuralNetworkGPU import NeuralNetworkMultiGPU
 class CheckersGame:
     def __init__(self):
         self.board = self.initialize_board()
+        self.bodies_of_captures = set() # used to represent recently captured positions on the UI.
         self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
         self.transition_memo = {}  # Memo dictionary for is_valid_transition
         self.player1_moves = 0
@@ -23,21 +24,36 @@ class CheckersGame:
     def initialize_board(self):
         # Define the initial checkers board setup
         board = np.zeros((8, 8), dtype=int)
-        # Place initial pieces (1 for player, -1 for opponent)
-        board[0:3:2, 1::2] = -1
-        board[1:3:2, ::2] = -1
-        board[5:8:2, 0::2] = 1
-        board[6:8:2, 1::2] = 1
         # Mark non-playable tiles with 3
         for row in range(8):
             for col in range(8):
                 if (row + col) % 2 == 0:
                     board[row, col] = 3
+        """
+        Visualization of the matrix after this step:
+        [
+            [3, 0, 3, 0, 3, 0, 3, 0],  # 0
+            [0, 3, 0, 3, 0, 3, 0, 3],  # 1
+            [3, 0, 3, 0, 3, 0, 3, 0],  # 2
+            [0, 3, 0, 3, 0, 3, 0, 3],  # 3
+            [3, 0, 3, 0, 3, 0, 3, 0],  # 4
+            [0, 3, 0, 3, 0, 3, 0, 3],  # 5
+            [3, 0, 3, 0, 3, 0, 3, 0],  # 6
+            [0, 3, 0, 3, 0, 3, 0, 3],  # 7
+        ]
+        """
         return board
+    
+    def place_players_chips(self):
+        # Place initial pieces (1 for player, -1 for opponent)
+        self.board[0:3:2, 1::2] = -1
+        self.board[1:3:2, ::2] = -1
+        self.board[5:8:2, 0::2] = 1
+        self.board[6:8:2, 1::2] = 1
 
     def get_board_state(self):
         # Flatten the board to a 1D array for the neural network input
-        return self.board.flatten()
+        return self.board
 
     def is_valid_transition(self, current_board, new_board, from_pos, to_pos):
         """
@@ -135,6 +151,17 @@ class CheckersGame:
         mid_row = (from_pos[0] + to_pos[0]) // 2
         mid_col = (from_pos[1] + to_pos[1]) // 2
         
+        # Check if the middle position has an opponent's piece (regular or crowned)
+        if self.are_coordenates_an_opponents_piece(current_board, mid_row, mid_col, piece) and new_board[mid_row, mid_col] == 0:
+            return True
+        print(f"Invalid capturing move from {from_pos} to {to_pos} with middle {mid_row, mid_col}")
+        return False
+
+     
+    def are_coordenates_an_opponents_piece(self, board, row, col, piece_or_player):
+        """
+            piece_moving is the piece of the current player that is moving
+        """
         # used to get the potential opponents piece:
         oponents_piece = {
             1:{ -1, -2},
@@ -142,13 +169,15 @@ class CheckersGame:
             -1:{ 1, 2},
             -2:{ 1, 2},
         }
+        return board[row, col] in oponents_piece[piece_or_player]
 
-        # Check if the middle position has an opponent's piece (regular or crowned)
-        if current_board[mid_row, mid_col] in oponents_piece[piece] and new_board[mid_row, mid_col] == 0:
-            return True
-        print(f"Invalid capturing move from {from_pos} to {to_pos} with middle {mid_row, mid_col}")
-        return False
+    def are_coordenates_valid(self, board, row, col):
+        # returns true if the cordenates are in the bounds of the board and it is not a tile 3, or umplayable tile.
+        return 0 <= row < 8 and 0 <= col < 8 and board[row, col] != 3
+    
 
+    def are_coordenates_empty_and_playable(self, board, row, col):
+        return self.are_coordenates_valid(board, row, col) and board[row, col] == 0
 
 
     def check_multiple_captures(self, current_board, new_board, from_pos, to_pos, piece):
@@ -171,10 +200,11 @@ class CheckersGame:
         step_col = int(col_diff / abs(col_diff))
         current_row, current_col = from_pos
         captures = 0
+
         while (current_row, current_col) != (to_pos[0], to_pos[1]):
             current_row += step_row
             current_col += step_col
-            if current_board[current_row, current_col] == -piece and new_board[current_row, current_col] == 0:
+            if self.are_coordenates_an_opponents_piece(current_board, current_row, current_col, piece) and new_board[current_row, current_col] == 0:
                 captures += 1
             elif current_board[current_row, current_col] != 0 or new_board[current_row, current_col] != 0:
                 print("Invalid move during multiple captures")
@@ -184,71 +214,69 @@ class CheckersGame:
         print("No captures during multiple capture move")
         return False
 
+
     def generate_valid_moves(self, board, player):
-        """
-        Generate all potential valid moves for a given player.
-        
-        Parameters:
-        board (np.ndarray): The current board state.
-        player (int): The player number (1 for player 1, -1 for player -1).
-        
-        Returns:
-        list: A list of board states representing all valid moves.
-        """
-        # Use the board and player as a key for memoization
-        board_key = (board.tobytes(), player)
-        
-        if board_key in self.valid_moves_memo:
-            return self.valid_moves_memo[board_key]
-        
-        board = board.reshape((8, 8))
-        valid_moves = []
         capturing_moves = []
-        
-        regular_directions = [(-1, -1), (-1, 1)] if player == 1 else [(1, -1), (1, 1)]
-        crowned_directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        non_capturing_moves = []
         
         for row in range(8):
             for col in range(8):
                 piece = board[row, col]
                 if piece == player or piece == 2 * player:
-                    directions = crowned_directions if piece == 2 * player else regular_directions
-                    for direction in directions:
-                        new_row, new_col = row + direction[0], col + direction[1]
-                        if 0 <= new_row < 8 and 0 <= new_col < 8 and board[new_row, new_col] == 0:
-                            new_board = board.copy()
-                            new_board[row, col] = 0
-                            # Crown the piece if it reaches the opposite end
-                            if (player == 1 and new_row == 0) or (player == -1 and new_row == 7):
-                                new_board[new_row, new_col] = 2 * player
-                            else:
-                                new_board[new_row, new_col] = piece
-                            if self.is_valid_transition(board, new_board, (row, col), (new_row, new_col)):
-                                valid_moves.append(new_board.flatten())
-                    
-                    # Check capturing moves
-                    for direction in directions:
-                        new_row, new_col = row + 2 * direction[0], col + 2 * direction[1]
-                        mid_row, mid_col = row + direction[0], col + direction[1]
-                        if 0 <= new_row < 8 and 0 <= new_col < 8 and board[new_row, new_col] == 0 and (board[mid_row, mid_col] == -player or board[mid_row, mid_col] == -2 * player):
-                            new_board = board.copy()
-                            new_board[row, col] = 0
-                            new_board[mid_row, mid_col] = 0
-                            # Crown the piece if it reaches the opposite end
-                            if (player == 1 and new_row == 0) or (player == -1 and new_row == 7):
-                                new_board[new_row, new_col] = 2 * player
-                            else:
-                                new_board[new_row, new_col] = piece
-                            if self.is_valid_transition(board, new_board, (row, col), (new_row, new_col)):
-                                capturing_moves.append(new_board.flatten())
+                    self.find_all_capturing_moves(board, row, col, player, capturing_moves)
+                    if not capturing_moves:
+                        self.find_all_non_capturing_moves(board, row, col, player, non_capturing_moves)
         
-        # If capturing moves are available, they must be taken
-        if capturing_moves:
-            valid_moves = capturing_moves
+        return capturing_moves if capturing_moves else non_capturing_moves
 
-        # Memoize the result
-        self.valid_moves_memo[board_key] = valid_moves
-        return valid_moves
+
+    def get_directions_for_piece_during_capture(self, board, row, col, player):
+        chip_type = board[row, col]
+        directions = []
+        if player == 1 or chip_type in (2, -2):
+            directions = directions + [(-1, -1), (-1, 1), (-2, -2), (-2, 2)]
+        if player == -1 or chip_type in (2, -2):
+            directions = directions + [(1, -1), (1, 1), (2, -2), (2, 2)]
+        return directions
+
+
+    def get_directions_for_piece_non_capture(self, board, row, col, player):
+        chip_type = board[row, col]
+        directions = []
+        if player == 1 or chip_type in (2, -2):
+            directions = directions + [(-1, -1), (-1, 1)]
+        if player == -1 or chip_type in (2, -2):
+            directions = directions + [(1, -1), (1, 1)]
+        return directions
+
+    def find_all_capturing_moves(self, board, row, col, player, capturing_moves, path=[]):
+        directions = self.get_directions_for_piece_during_capture(board, row, col, player)
+        found = False
+        for dr, dc in directions:
+            mid_row, mid_col = row + dr // 2, col + dc // 2
+            new_row, new_col = row + dr, col + dc
+            if self.are_coordenates_valid(board, new_row, new_col) and self.are_coordenates_empty_and_playable(board, new_row, new_col):
+                if self.are_coordenates_an_opponents_piece(board, mid_row, mid_col, player):
+                    new_board = board.copy()
+                    new_board[row, col] = 0
+                    new_board[mid_row, mid_col] = 0
+                    new_board[new_row, new_col] = board[row, col]
+                    path.append((row, col, new_row, new_col))
+                    self.find_all_capturing_moves(new_board, new_row, new_col, player, capturing_moves, path)
+                    found = True
+                    path.pop()
+        
+        if not found and path:
+            capturing_moves.append(path.copy())
+
+
+    def find_all_non_capturing_moves(self, board, row, col, player, non_capturing_moves):
+        directions = self.get_directions_for_piece_non_capture(board, row, col, player)
+
+        for dr, dc in directions:
+            new_row, new_col = row + dr, col + dc
+            if self.are_coordenates_valid(board, new_row, new_col) and self.are_coordenates_empty_and_playable(board, new_row, new_col):
+                non_capturing_moves.append([(row, col, new_row, new_col)])
 
 
     def print_board(self, board=None):
@@ -269,7 +297,10 @@ class CheckersGame:
                 if piece == 3:
                     char = '\033[40m \033[40m  \033[0m'  # Dark square
                 elif piece == 0:
-                    char = '\033[47m \033[47m  \033[0m'  # White square
+                    c = ' '
+                    if f"{row}_{col}" in self.bodies_of_captures:
+                        c = 'X'
+                    char = f'\033[47m \033[47m{c} \033[0m'  # White square
                 elif piece == 1:
                     char = '\033[42m \033[42mO \033[0m'  # Green square (player 1)
                 elif piece == 2:
@@ -288,11 +319,22 @@ class CheckersGame:
         """
         Run a slow simulation of the game where players make random valid moves.
         """
+
+        # self.board = np.array([
+        #     [3, 0, 3, 0, 3, 0, 3, 0],
+        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (1, 6) should be valid
+        #     [3, 0, 3, 0, 3, -1, 3, 0], # (2, 5) enemy tile
+        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (3, 4) should be open
+        #     [3, 0, 3, -1, 3, 0, 3, 0], # (4, 3) player -1
+        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (5, 2) should be open
+        #     [3, -1, 3, 0, 3, 0, 3, 0], # (6, 1) player -1
+        #     [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown
+        # ])
         player = 1  # Start with player 1
         print("Current Board:")
         self.print_board()  # Print the board for debugging
         while True:
-            valid_moves = self.generate_valid_moves(self.get_board_state(), player)
+            valid_moves = self.generate_valid_moves(self.board, player)
             if not valid_moves:
                 print(f"Player {player} has no valid moves. Game over.")
                 print(f"Player 1 moves: {self.player1_moves}")
@@ -303,9 +345,8 @@ class CheckersGame:
                 break
 
             chosen_move = random.choice(valid_moves)
-            from_pos, to_pos = self.get_move_positions(self.board, chosen_move.reshape((8, 8)))
-            self.update_score_and_board(from_pos, to_pos, player)
-            self.board = chosen_move.reshape((8, 8))
+            self.update_score_and_board(chosen_move, player)
+            # self.board = chosen_move[-1][-2:]  # Update board to the final position after the sequence
             
             # Check for loop
             if self.detect_loop():
@@ -317,7 +358,7 @@ class CheckersGame:
             print(f"Player 1 score: {self.player1_score}")
             print(f"Player -1 score: {self.player2_score}")
             print(f"Total moves: {self.total_moves}")
-            time.sleep(1)  # Wait for 2 seconds
+            time.sleep(1)  # Wait for 1 second
 
             if player == 1:
                 self.player1_moves += 1
@@ -332,66 +373,50 @@ class CheckersGame:
                 print(f"Total moves: {self.total_moves}")
                 break
 
-    def get_move_positions(self, current_board, new_board):
-        """
-        Get the from and to positions for a move.
-        
-        Parameters:
-        current_board (np.ndarray): The current board state.
-        new_board (np.ndarray): The new board state.
-        
-        Returns:
-        tuple: The from and to positions of the move.
-        """
-        current_board = current_board.reshape((8, 8))
-        new_board = new_board.reshape((8, 8))
-        
-        changes = np.argwhere(current_board != new_board)
-        
-        from_pos = changes[0] if current_board[changes[0][0], changes[0][1]] != 0 else changes[1]
-        to_pos = changes[1] if from_pos is changes[0] else changes[0]
-        
-        return (from_pos[0], from_pos[1]), (to_pos[0], to_pos[1])
 
-
-    def update_score_and_board(self, from_pos, to_pos, player):
+    def update_score_and_board(self, move_positions, player):
         """
-        Update the score and board state after a move.
-        
+        Update the score and board state after a move sequence.
+
         Parameters:
-        from_pos (tuple): The starting position of the piece.
-        to_pos (tuple): The ending position of the piece.
+        move_positions (list): A list of tuples representing the from and to positions for each jump in the sequence.
+        ie on multiple routes: [(7, 0, 5, 2), (5, 2, 3, 4)]
+        ie on single move:
         player (int): The player making the move.
         """
-        # Move the piece
-        self.board[to_pos[0], to_pos[1]] = self.board[from_pos[0], from_pos[1]]
-        self.board[from_pos[0], from_pos[1]] = 0
+        self.bodies_of_captures = set() # reset bodies
+        for move in move_positions:
+            from_pos, to_pos = (move[0], move[1]), (move[-2], move[-1])
+            # Move the piece
+            self.board[to_pos[0], to_pos[1]] = self.board[from_pos[0], from_pos[1]]
+            self.board[from_pos[0], from_pos[1]] = 0
 
-        # Check for captures and remove the captured pieces
-        row_diff = to_pos[0] - from_pos[0]
-        col_diff = to_pos[1] - from_pos[1]
+            # Check for captures and remove the captured pieces
+            row_diff = to_pos[0] - from_pos[0]
+            col_diff = to_pos[1] - from_pos[1]
 
-        if abs(row_diff) == 2 and abs(col_diff) == 2:
-            mid_row = (from_pos[0] + to_pos[0]) // 2
-            mid_col = (from_pos[1] + to_pos[1]) // 2
-            self.board[mid_row, mid_col] = 0
-        elif abs(row_diff) > 2 or abs(col_diff) > 2:
-            step_row = int(row_diff / abs(row_diff))
-            step_col = int(col_diff / abs(col_diff))
-            current_row, current_col = from_pos
-            while (current_row, current_col) != (to_pos[0], to_pos[1]):
-                current_row += step_row
-                current_col += step_col
-                if self.board[current_row, current_col] == -player or self.board[current_row, current_col] == -2 * player:
-                    self.board[current_row, current_col] = 0
+            if abs(row_diff) == 2 and abs(col_diff) == 2:
+                mid_row = (from_pos[0] + to_pos[0]) // 2
+                mid_col = (from_pos[1] + to_pos[1]) // 2
+                self.bodies_of_captures.add(f"{mid_row}_{mid_col}")
+                self.board[mid_row, mid_col] = 0
+            elif abs(row_diff) > 2 or abs(col_diff) > 2:
+                step_row = int(row_diff / abs(row_diff))
+                step_col = int(col_diff / abs(col_diff))
+                current_row, current_col = from_pos
+                while (current_row, current_col) != (to_pos[0], to_pos[1]):
+                    current_row += step_row
+                    current_col += step_col
+                    if self.board[current_row, current_col] == -player or self.board[current_row, current_col] == -2 * player:
+                        self.bodies_of_captures.add(f"{current_row}_{current_col}")
+                        self.board[current_row, current_col] = 0
 
-        # Check if the piece should be crowned
-        if (player == 1 and to_pos[0] == 0) or (player == -1 and to_pos[0] == 7):
-            self.board[to_pos[0], to_pos[1]] = 2 * player
+            # Check if the piece should be crowned
+            if (player == 1 and to_pos[0] == 0) or (player == -1 and to_pos[0] == 7):
+                self.board[to_pos[0], to_pos[1]] = 2 * player
 
         # Update the scores based on the current board state
         self.update_game_scores()
-
     
     def get_scores(self, board):
         """
@@ -401,7 +426,11 @@ class CheckersGame:
         """
         player1_pieces = np.count_nonzero((board == 1) | (board == 2))
         player2_pieces = np.count_nonzero((board == -1) | (board == -2))
-        return (12 - player2_pieces), (12 - player1_pieces)
+
+        player1_c_pieces = np.count_nonzero(board == 2)
+        player2_c_pieces = np.count_nonzero(board == -2)
+
+        return (12 - player2_pieces) + player1_c_pieces * 3, (12 - player1_pieces) + player2_c_pieces * 3
 
     def update_game_scores(self):
         """
@@ -418,7 +447,7 @@ class CheckersGame:
         Returns:
         bool: True if a loop is detected, False otherwise.
         """
-        board_state = self.get_board_state().tobytes()
+        board_state = f"{self.board}"
         
         if board_state in self.previous_boards:
             self.loop_counter += 1
@@ -435,4 +464,5 @@ class CheckersGame:
 # Quick run:
 if __name__ == "__main__":
     game = CheckersGame()
+    game.place_players_chips()
     game.run_simulation()
