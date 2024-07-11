@@ -422,7 +422,8 @@ class CheckersGame:
         """
         This functions determines the points of each player based on the count of the chips.
         This can be used to tell the points on any of the games.
-        maximum score of a player is 12 for now.
+        A player gets one point per chip the enemy is missing,
+        player also gets 3 points per crown/super that the plauyer gets
         """
         player1_pieces = np.count_nonzero((board == 1) | (board == 2))
         player2_pieces = np.count_nonzero((board == -1) | (board == -2))
