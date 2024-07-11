@@ -1,8 +1,14 @@
 import numpy as np
-import cupy as cp
-import time
-import random
-from NeuralNetworkGPU import NeuralNetworkMultiGPU
+
+DEBUG_ON = True # set to false if not interested on the ouputs
+TRAINING = True # set False if not interested on training the nn
+    
+def debug_print(*args, end=None):
+    if DEBUG_ON:
+        if end:
+            print(*args, end=end)
+        else:
+            print(*args, end=end)
 
 class CheckersGame:
     def __init__(self):
@@ -80,7 +86,7 @@ class CheckersGame:
         
         # Check if the piece at the from position has moved to the to position
         if not self.check_move_to_position(new_board, from_pos, to_pos, expected_piece_at_to_pos):
-            print("Invalid move: piece at from_pos did not move to to_pos correctly")
+            debug_print("Invalid move: piece at from_pos did not move to to_pos correctly")
             return False
         
         row_diff = to_pos[0] - from_pos[0]
@@ -98,7 +104,7 @@ class CheckersGame:
         if abs(row_diff) > 2 or abs(col_diff) > 2:
             return self.check_multiple_captures(current_board, new_board, from_pos, to_pos, piece)
         
-        print("Invalid move: not a valid single, capturing, or multiple capture move")
+        debug_print("Invalid move: not a valid single, capturing, or multiple capture move")
         return False
 
     def check_move_to_position(self, new_board, from_pos, to_pos, expected_piece_at_to_pos):
@@ -131,7 +137,7 @@ class CheckersGame:
         """
         if new_board[to_pos[0], to_pos[1]] == expected_piece_at_to_pos and new_board[from_pos[0], from_pos[1]] == 0:
             return True
-        print("Invalid simple move")
+        debug_print("Invalid simple move")
         return False
 
     def check_capturing_move(self, current_board, new_board, from_pos, to_pos, piece):
@@ -154,7 +160,7 @@ class CheckersGame:
         # Check if the middle position has an opponent's piece (regular or crowned)
         if self.are_coordenates_an_opponents_piece(current_board, mid_row, mid_col, piece) and new_board[mid_row, mid_col] == 0:
             return True
-        print(f"Invalid capturing move from {from_pos} to {to_pos} with middle {mid_row, mid_col}")
+        debug_print(f"Invalid capturing move from {from_pos} to {to_pos} with middle {mid_row, mid_col}")
         return False
 
      
@@ -207,11 +213,11 @@ class CheckersGame:
             if self.are_coordenates_an_opponents_piece(current_board, current_row, current_col, piece) and new_board[current_row, current_col] == 0:
                 captures += 1
             elif current_board[current_row, current_col] != 0 or new_board[current_row, current_col] != 0:
-                print("Invalid move during multiple captures")
+                debug_print("Invalid move during multiple captures")
                 return False
         if captures > 0:
             return True
-        print("No captures during multiple capture move")
+        debug_print("No captures during multiple capture move")
         return False
 
 
@@ -278,7 +284,7 @@ class CheckersGame:
             if self.are_coordenates_valid(board, new_row, new_col) and self.are_coordenates_empty_and_playable(board, new_row, new_col):
                 non_capturing_moves.append([(row, col, new_row, new_col)])
 
-
+    
     def print_board(self, board=None):
         """
         Print the current board with colors in the console.
@@ -309,69 +315,9 @@ class CheckersGame:
                     char = '\033[41m \033[41mV \033[0m'  # Red square (player -1)
                 elif piece == -2:
                     char = '\033[41m♛ \033[41m \033[0m'  # Crowned piece (player -1)
-                print(char, end=" ")
-            print()  # Newline after each row
+                debug_print(char, end=" ")
+            debug_print()  # Newline after each row
 
-
-
-
-    def run_simulation(self):
-        """
-        Run a slow simulation of the game where players make random valid moves.
-        """
-
-        # self.board = np.array([
-        #     [3, 0, 3, 0, 3, 0, 3, 0],
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (1, 6) should be valid
-        #     [3, 0, 3, 0, 3, -1, 3, 0], # (2, 5) enemy tile
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (3, 4) should be open
-        #     [3, 0, 3, -1, 3, 0, 3, 0], # (4, 3) player -1
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (5, 2) should be open
-        #     [3, -1, 3, 0, 3, 0, 3, 0], # (6, 1) player -1
-        #     [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown
-        # ])
-        player = 1  # Start with player 1
-        print("Current Board:")
-        self.print_board()  # Print the board for debugging
-        while True:
-            valid_moves = self.generate_valid_moves(self.board, player)
-            if not valid_moves:
-                print(f"Player {player} has no valid moves. Game over.")
-                print(f"Player 1 moves: {self.player1_moves}")
-                print(f"Player -1 moves: {self.player2_moves}")
-                print(f"Player 1 score: {self.player1_score}")
-                print(f"Player -1 score: {self.player2_score}")
-                print(f"Total moves: {self.total_moves}")
-                break
-
-            chosen_move = random.choice(valid_moves)
-            self.update_score_and_board(chosen_move, player)
-            # self.board = chosen_move[-1][-2:]  # Update board to the final position after the sequence
-            
-            # Check for loop
-            if self.detect_loop():
-                print("Loop detected. Game ends in a tie.")
-                print(f"Total moves: {self.total_moves}")
-                break
-
-            self.print_board()
-            print(f"Player 1 score: {self.player1_score}")
-            print(f"Player -1 score: {self.player2_score}")
-            print(f"Total moves: {self.total_moves}")
-            time.sleep(1)  # Wait for 1 second
-
-            if player == 1:
-                self.player1_moves += 1
-            else:
-                self.player2_moves += 1
-
-            player = -player  # Switch player
-
-            self.total_moves += 1
-            if self.total_moves >= self.move_limit:
-                print("Move limit reached. Game ends in a tie.")
-                print(f"Total moves: {self.total_moves}")
-                break
 
 
     def update_score_and_board(self, move_positions, player):
@@ -461,9 +407,3 @@ class CheckersGame:
             self.previous_boards.pop(0)  # Keep only the last N board states
         
         return self.loop_counter >= self.loop_threshold
-
-# Quick run:
-if __name__ == "__main__":
-    game = CheckersGame()
-    game.place_players_chips()
-    game.run_simulation()

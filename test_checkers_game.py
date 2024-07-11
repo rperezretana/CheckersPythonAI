@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-from CheckersGame import CheckersGame
+from CheckersTraining import CheckersTraining
 
 class TestCheckersGame(unittest.TestCase):
     def setUp(self):
-        self.game = CheckersGame()
+        self.game = CheckersTraining()
     
 
     # def test_generate_valid_moves_crowning(self):
@@ -74,7 +74,7 @@ class TestCheckersGame(unittest.TestCase):
     #     self.assertEqual(valid_moves, expected_moves, "Generated move not in expected positions.")
     
     def test_generate_valid_moves_capture(self):
-        self.game = CheckersGame()
+        self.game = CheckersTraining()
         self.game.board = np.array([
             [3, 0, 3, 0, 3, 0, 3, 0],
             [0, 3, 0, 3, 0, 3, 0, 3],
@@ -107,7 +107,7 @@ class TestCheckersGame(unittest.TestCase):
 
 
     def test_generate_valid_moves_capture_by_crown(self):
-        self.game = CheckersGame()
+        self.game = CheckersTraining()
         self.game.board = np.array([
             [3, 0, 3, 0, 3, 0, 3, 0],
             [0, 3, 0, 3, 0, 3, 0, 3],
