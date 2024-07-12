@@ -1,32 +1,56 @@
 
+import math
 import time
-import random
 from CheckersGame import CheckersGame, debug_print, DEBUG_ON
 from NeuralNetworkGPU import NeuralNetworkMultiGPU
 
 
 class CheckersTraining(CheckersGame):
 
+    def __init__(self):
+        super().__init__()
+        self.nn = NeuralNetworkMultiGPU([65, 129, 65, 1])  # Initialize your neural network
+
+
+    def simulate_play_on_board(self, board, move, player):
+        new_board = self.update_score_and_board(move, player, board)
+        return new_board.flatten()
+
+    def calculate_reward(self, player):
+        if self.player1_score > self.player2_score:
+            return 100 if player == 1 else -100
+        elif self.player1_score < self.player2_score:
+            return -100 if player == 1 else 100
+        return 0  # Tie or no significant change
+
+    def have_nn_select_moves(self, valid_moves, player):
+        best_percentage = -math.inf 
+        best_move = None
+        flat_board = None
+        for current_move in valid_moves:
+            new_board = self.board.copy()
+            # we send the current player as input and the state of the board
+            flat_board = self.simulate_play_on_board(new_board, current_move, player)
+            score_move_percentage = self.nn.predict([player] + flat_board)
+            if best_percentage < score_move_percentage:
+                best_move = current_move
+                best_percentage = score_move_percentage
+        return best_move, flat_board
+
+
     def run_simulation(self):
         """
         Run a slow simulation of the game where players make random valid moves.
         """
-
-        # self.board = np.array([
-        #     [3, 0, 3, 0, 3, 0, 3, 0],
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (1, 6) should be valid
-        #     [3, 0, 3, 0, 3, -1, 3, 0], # (2, 5) enemy tile
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (3, 4) should be open
-        #     [3, 0, 3, -1, 3, 0, 3, 0], # (4, 3) player -1
-        #     [0, 3, 0, 3, 0, 3, 0, 3],  # (5, 2) should be open
-        #     [3, -1, 3, 0, 3, 0, 3, 0], # (6, 1) player -1
-        #     [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown
-        # ])
         print(f"Started in debug mode: {DEBUG_ON} ")
-        total_games = 0;
+        total_games = 0
         while True: # run until interrupted by the user this way it runs many games one after the other
             print(f"Total Games played: {total_games}")
             self.board = self.initialize_board()
+            plays_from_players = {
+                1: [],
+                2: []
+            }
             self.place_players_chips()
             total_games+=1
             player = 1  # Start with player 1
@@ -44,7 +68,12 @@ class CheckersTraining(CheckersGame):
                     debug_print(f"Total moves: {self.total_moves}")
                     break
 
-                chosen_move = random.choice(valid_moves)
+                # let the nn select a move  
+                chosen_move, flat_board = self.have_nn_select_moves(valid_moves, player)
+                if not chosen_move:
+                    raise ("There is a problem, no move was chosen.")
+                
+                plays_from_players[player].append(flat_board)
                 self.update_score_and_board(chosen_move, player)
                 # self.board = chosen_move[-1][-2:]  # Update board to the final position after the sequence
                 
@@ -72,6 +101,15 @@ class CheckersTraining(CheckersGame):
                     debug_print("Move limit reached. Game ends in a tie.")
                     debug_print(f"Total moves: {self.total_moves}")
                     break
+            # ended game so we can train based off result:
+            # Train the neural network
+            # plays_from_players[player].append(flat_board)
+            for play in plays_from_players[1]:
+                reward = self.calculate_reward(1)
+                self.nn.train(play, reward)
+            for play in plays_from_players[0]:
+                reward = self.calculate_reward(-1)
+                self.nn.train(play, reward)
 
 # Quick run:
 if __name__ == "__main__":

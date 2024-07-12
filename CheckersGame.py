@@ -320,22 +320,26 @@ class CheckersGame:
 
 
 
-    def update_score_and_board(self, move_positions, player):
+    def update_score_and_board(self, move_positions, player, board=None):
         """
         Update the score and board state after a move sequence.
 
         Parameters:
         move_positions (list): A list of tuples representing the from and to positions for each jump in the sequence.
         ie on multiple routes: [(7, 0, 5, 2), (5, 2, 3, 4)]
-        ie on single move:
+        ie on single move: [(7, 0, 5, 2)]
         player (int): The player making the move.
         """
+        if not board.any():
+            board = self.board
+
+        # bodies are the recently captured positions
         self.bodies_of_captures = set() # reset bodies
         for move in move_positions:
             from_pos, to_pos = (move[0], move[1]), (move[-2], move[-1])
             # Move the piece
-            self.board[to_pos[0], to_pos[1]] = self.board[from_pos[0], from_pos[1]]
-            self.board[from_pos[0], from_pos[1]] = 0
+            board[to_pos[0], to_pos[1]] = board[from_pos[0], from_pos[1]]
+            board[from_pos[0], from_pos[1]] = 0
 
             # Check for captures and remove the captured pieces
             row_diff = to_pos[0] - from_pos[0]
@@ -345,7 +349,7 @@ class CheckersGame:
                 mid_row = (from_pos[0] + to_pos[0]) // 2
                 mid_col = (from_pos[1] + to_pos[1]) // 2
                 self.bodies_of_captures.add(f"{mid_row}_{mid_col}")
-                self.board[mid_row, mid_col] = 0
+                board[mid_row, mid_col] = 0
             elif abs(row_diff) > 2 or abs(col_diff) > 2:
                 step_row = int(row_diff / abs(row_diff))
                 step_col = int(col_diff / abs(col_diff))
@@ -353,16 +357,19 @@ class CheckersGame:
                 while (current_row, current_col) != (to_pos[0], to_pos[1]):
                     current_row += step_row
                     current_col += step_col
-                    if self.board[current_row, current_col] == -player or self.board[current_row, current_col] == -2 * player:
+                    if board[current_row, current_col] == -player or board[current_row, current_col] == -2 * player:
                         self.bodies_of_captures.add(f"{current_row}_{current_col}")
-                        self.board[current_row, current_col] = 0
+                        board[current_row, current_col] = 0
 
             # Check if the piece should be crowned
             if (player == 1 and to_pos[0] == 0) or (player == -1 and to_pos[0] == 7):
-                self.board[to_pos[0], to_pos[1]] = 2 * player
+                board[to_pos[0], to_pos[1]] = 2 * player
 
         # Update the scores based on the current board state
-        self.update_game_scores()
+        # but only if the main scoreboard is updated
+        if not board.any():
+            self.update_game_scores()
+        return board
     
     def get_scores(self, board):
         """
