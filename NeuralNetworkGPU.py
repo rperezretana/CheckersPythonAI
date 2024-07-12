@@ -14,13 +14,15 @@ class NeuralNetworkMultiGPU:
         return weights
     
     def forward(self, x):
-        activations = [cp.array(x)]
+        x = cp.array(x)
+        activations = [x]
         for weight in self.weights:
             x = cp.dot(x, weight)
             activations.append(x)
         return activations
 
     def backward(self, activations, y):
+        y = cp.array(y)
         output_error = activations[-1] - y
         deltas = [output_error * self._sigmoid_derivative(activations[-1])]
         
@@ -41,4 +43,5 @@ class NeuralNetworkMultiGPU:
         self.backward(activations, y)
 
     def predict(self, x):
+        x = cp.array(x)
         return self.forward(x)[-1]

@@ -330,7 +330,7 @@ class CheckersGame:
         ie on single move: [(7, 0, 5, 2)]
         player (int): The player making the move.
         """
-        if not board.any():
+        if board is None or not board.any():
             board = self.board
 
         # bodies are the recently captured positions
@@ -367,7 +367,7 @@ class CheckersGame:
 
         # Update the scores based on the current board state
         # but only if the main scoreboard is updated
-        if not board.any():
+        if board is None or not board.any():
             self.update_game_scores()
         return board
     

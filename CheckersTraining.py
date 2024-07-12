@@ -2,15 +2,15 @@
 import math
 import time
 from CheckersGame import CheckersGame, debug_print, DEBUG_ON
-from NeuralNetworkGPU import NeuralNetworkMultiGPU
+from CheckersNN import CheckersNN
+import numpy as np
 
 
 class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
-        self.nn = NeuralNetworkMultiGPU([65, 129, 65, 1])  # Initialize your neural network
-
+        self.nn = CheckersNN()  # Initialize neural network
 
     def simulate_play_on_board(self, board, move, player):
         new_board = self.update_score_and_board(move, player, board)
@@ -26,16 +26,17 @@ class CheckersTraining(CheckersGame):
     def have_nn_select_moves(self, valid_moves, player):
         best_percentage = -math.inf 
         best_move = None
-        flat_board = None
+        flat_board_with_player = None
         for current_move in valid_moves:
             new_board = self.board.copy()
             # we send the current player as input and the state of the board
             flat_board = self.simulate_play_on_board(new_board, current_move, player)
-            score_move_percentage = self.nn.predict([player] + flat_board)
+            flat_board_with_player = np.array([player] + flat_board.tolist()).reshape(1, -1)
+            score_move_percentage = self.nn.predict(flat_board_with_player)[0][0]
             if best_percentage < score_move_percentage:
                 best_move = current_move
                 best_percentage = score_move_percentage
-        return best_move, flat_board
+        return best_move, flat_board_with_player
 
 
     def run_simulation(self):
@@ -49,7 +50,7 @@ class CheckersTraining(CheckersGame):
             self.board = self.initialize_board()
             plays_from_players = {
                 1: [],
-                2: []
+                -1: []
             }
             self.place_players_chips()
             total_games+=1
@@ -69,11 +70,11 @@ class CheckersTraining(CheckersGame):
                     break
 
                 # let the nn select a move  
-                chosen_move, flat_board = self.have_nn_select_moves(valid_moves, player)
+                chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
                 if not chosen_move:
                     raise ("There is a problem, no move was chosen.")
                 
-                plays_from_players[player].append(flat_board)
+                plays_from_players[player].append(flat_board_with_player) # [0])
                 self.update_score_and_board(chosen_move, player)
                 # self.board = chosen_move[-1][-2:]  # Update board to the final position after the sequence
                 
@@ -104,12 +105,13 @@ class CheckersTraining(CheckersGame):
             # ended game so we can train based off result:
             # Train the neural network
             # plays_from_players[player].append(flat_board)
-            for play in plays_from_players[1]:
-                reward = self.calculate_reward(1)
-                self.nn.train(play, reward)
-            for play in plays_from_players[0]:
-                reward = self.calculate_reward(-1)
-                self.nn.train(play, reward)
+            if self.player1_score != self.player2_score:
+                for play in plays_from_players[1]: # player 1
+                    reward = self.calculate_reward(1)
+                    self.nn.train(np.array([play]), np.array([reward]))
+                for play in plays_from_players[-1]: # player -1
+                    reward = self.calculate_reward(-1)
+                    self.nn.train(np.array([play]), np.array([reward]))
 
 # Quick run:
 if __name__ == "__main__":
