@@ -1,16 +1,22 @@
-
 import math
 import time
+import numpy as np
 from CheckersGame import CheckersGame, debug_print, DEBUG_ON
 from CheckersNN import CheckersNN
-import numpy as np
-
 
 class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
         self.nn = CheckersNN()  # Initialize neural network
+        self.games_played = 0
+        self.save_interval = 100  # Save model every 100 games
+        self.model_path = "checkers_model.h5"
+        try:
+            self.nn.load(self.model_path)
+            print("Loaded model from", self.model_path)
+        except:
+            print("No saved model found, starting fresh")
 
     def simulate_play_on_board(self, board, move, player):
         new_board = self.update_score_and_board(move, player, board)
@@ -38,22 +44,20 @@ class CheckersTraining(CheckersGame):
                 best_percentage = score_move_percentage
         return best_move, flat_board_with_player
 
-
     def run_simulation(self):
         """
         Run a slow simulation of the game where players make random valid moves.
         """
         print(f"Started in debug mode: {DEBUG_ON} ")
-        total_games = 0
-        while True: # run until interrupted by the user this way it runs many games one after the other
-            print(f"Total Games played: {total_games}")
+        while True:  # run until interrupted by the user this way it runs many games one after the other
+            print(f"Total Games played: {self.games_played}")
             self.board = self.initialize_board()
             plays_from_players = {
                 1: [],
                 -1: []
             }
             self.place_players_chips()
-            total_games+=1
+            self.games_played += 1
             player = 1  # Start with player 1
             debug_print("Current Board:")
             self.print_board()  # Print the board for debugging
@@ -72,9 +76,9 @@ class CheckersTraining(CheckersGame):
                 # let the nn select a move  
                 chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
                 if not chosen_move:
-                    raise ("There is a problem, no move was chosen.")
+                    raise Exception("There is a problem, no move was chosen.")
                 
-                plays_from_players[player].append(flat_board_with_player) # [0])
+                plays_from_players[player].append(flat_board_with_player)  # [0])
                 self.update_score_and_board(chosen_move, player)
                 # self.board = chosen_move[-1][-2:]  # Update board to the final position after the sequence
                 
@@ -106,12 +110,17 @@ class CheckersTraining(CheckersGame):
             # Train the neural network
             # plays_from_players[player].append(flat_board)
             if self.player1_score != self.player2_score:
-                for play in plays_from_players[1]: # player 1
+                for play in plays_from_players[1]:  # player 1
                     reward = self.calculate_reward(1)
                     self.nn.train(np.array([play]), np.array([reward]))
-                for play in plays_from_players[-1]: # player -1
+                for play in plays_from_players[-1]:  # player -1
                     reward = self.calculate_reward(-1)
                     self.nn.train(np.array([play]), np.array([reward]))
+
+            # Save the model at regular intervals
+            if self.games_played % self.save_interval == 0:
+                self.nn.save(self.model_path)
+                print("Model saved after", self.games_played, "games")
 
 # Quick run:
 if __name__ == "__main__":

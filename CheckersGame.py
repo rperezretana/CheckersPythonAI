@@ -1,6 +1,6 @@
 import numpy as np
 
-DEBUG_ON = True # set to false if not interested on the ouputs
+DEBUG_ON = False # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
     
 def debug_print(*args, end=None):
@@ -13,6 +13,8 @@ def debug_print(*args, end=None):
 class CheckersGame:
     def __init__(self):
         self.board = self.initialize_board()
+
+    def initialize_board(self):
         self.bodies_of_captures = set() # used to represent recently captured positions on the UI.
         self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
         self.transition_memo = {}  # Memo dictionary for is_valid_transition
@@ -20,14 +22,13 @@ class CheckersGame:
         self.player2_moves = 0
         self.player1_score = 0
         self.player2_score = 0
-        self.previous_boards = []  # List to track the last N board states
         self.loop_counter = 0
         self.loop_threshold = 3  # Threshold to detect a loop
         self.recent_boards_limit = 5  # Number of recent boards to track
         self.total_moves = 0  # Counter for the total number of moves
         self.move_limit = 200  # Hard limit for the total number of moves
-
-    def initialize_board(self):
+        self.previous_boards = []  # List to track the last N board states
+        self.total_moves += 1
         # Define the initial checkers board setup
         board = np.zeros((8, 8), dtype=int)
         # Mark non-playable tiles with 3
