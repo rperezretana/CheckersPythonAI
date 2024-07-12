@@ -1,4 +1,8 @@
+import os
 import tensorflow as tf
+
+# Suppress TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {0, 1, 2, 3} based on the verbosity level
 
 class CheckersNN:
     def __init__(self):
@@ -9,7 +13,7 @@ class CheckersNN:
             tf.keras.layers.InputLayer(input_shape=(65,)),
             tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(128, activation='relu'),
-            tf.keras.layers.Dense(1, activation='sigmoid')
+            tf.keras.layers.Dense(1, activation='linear')
         ])
         model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
         return model
@@ -20,7 +24,7 @@ class CheckersNN:
     def predict(self, x):
         return self.model.predict(x)
     
-    def save(self, path):
+    def save_model(self, path):
         self.model.save(path)
     
     def load(self, path):

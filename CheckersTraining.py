@@ -1,4 +1,5 @@
 import math
+import os
 import time
 import numpy as np
 from CheckersGame import CheckersGame, debug_print, DEBUG_ON
@@ -10,7 +11,7 @@ class CheckersTraining(CheckersGame):
         super().__init__()
         self.nn = CheckersNN()  # Initialize neural network
         self.games_played = 0
-        self.save_interval = 100  # Save model every 100 games
+        self.save_interval = 10  # Save model every 100 games
         self.model_path = "checkers_model.h5"
         try:
             self.nn.load(self.model_path)
@@ -92,7 +93,8 @@ class CheckersTraining(CheckersGame):
                 debug_print(f"Player 1 score: {self.player1_score}")
                 debug_print(f"Player -1 score: {self.player2_score}")
                 debug_print(f"Total moves: {self.total_moves}")
-                time.sleep(1)  # Wait for 1 second
+                if DEBUG_ON:
+                    time.sleep(1)  # Wait for 1 second
 
                 if player == 1:
                     self.player1_moves += 1
@@ -119,8 +121,22 @@ class CheckersTraining(CheckersGame):
 
             # Save the model at regular intervals
             if self.games_played % self.save_interval == 0:
-                self.nn.save(self.model_path)
+                self.save_model()
                 print("Model saved after", self.games_played, "games")
+
+    def save_model(self):
+        # Rotate the backup files
+        # Shift model backups
+        if os.path.exists('checkers_model5.h5'):
+            os.remove('checkers_model5.h5')
+        for i in range(4, 0, -1):
+            src = f'checkers_model{i}.h5'
+            dst = f'checkers_model{i + 1}.h5'
+            if os.path.exists(src):
+                os.rename(src, dst)
+        if os.path.exists(self.model_path):
+            os.rename(self.model_path, 'checkers_model1.h5')
+        self.nn.save_model(self.model_path)
 
 # Quick run:
 if __name__ == "__main__":
