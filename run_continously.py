@@ -11,7 +11,6 @@ ES_SYSTEM_REQUIRED = 0x00000001
 ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
 
 try:
-    # Your training code goes here
     game = CheckersTraining()
     game.run_simulation()
 finally:
