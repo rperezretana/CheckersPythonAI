@@ -2,7 +2,7 @@ import numpy as np
 
 DEBUG_ON = True # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_PLAY =  False # This activates the random play, so the NN learns from randomness first
+RANDOM_PLAY = True # This activates the random play, so the NN learns from randomness first
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
@@ -13,6 +13,8 @@ def debug_print(*args, end=None):
 
 class CheckersGame:
     def __init__(self):
+        self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
+        self.transition_memo = {}  # Memo dictionary for is_valid_transition
         self.blank_board = None
         
         # Define the initial checkers board setup
@@ -27,8 +29,6 @@ class CheckersGame:
 
     def initialize_board(self):
         self.bodies_of_captures = set() # used to represent recently captured positions on the UI.
-        self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
-        self.transition_memo = {}  # Memo dictionary for is_valid_transition
         self.player1_moves = 0
         self.player2_moves = 0
         self.player1_score = 0

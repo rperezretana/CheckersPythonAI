@@ -5,73 +5,72 @@ from CheckersTraining import CheckersTraining
 class TestCheckersGame(unittest.TestCase):
     def setUp(self):
         self.game = CheckersTraining()
-    
 
-    # def test_generate_valid_moves_crowning(self):
-    #     # Initialize the board with a single chip for player 1 one move away from being crowned
-    #     self.game.board = np.array([
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 1, 3],  # Chip in a playable position near the opposite end
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3]
-    #     ])
+    def test_generate_valid_moves_crowning(self):
+        # Initialize the board with a single chip for player 1 one move away from being crowned
+        self.game.board = np.array([
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 1, 3],  # Chip in a playable position near the opposite end
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3]
+        ])
         
-    #     valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
-    #     self.assertEqual(len(valid_moves), 2, "There should be 2 valid move for a single chip one move away from being crowned.")
+        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        self.assertEqual(len(valid_moves), 2, "There should be 2 valid move for a single chip one move away from being crowned.")
 
-    #     chosen_move = valid_moves[0]
-    #     self.game.update_score_and_board(chosen_move, 1)
+        chosen_move = valid_moves[0]
+        self.game.update_score_and_board(chosen_move, 1)
         
-    #     expected_moves = [[(1, 6, 0, 5)], [(1, 6, 0, 7)]]
-    #     self.assertEqual(expected_moves, valid_moves, "Expected moves dont match.")
-
+        expected_moves = [[(1, 6, 0, 5)], [(1, 6, 0, 7)]]
+        self.assertEqual(expected_moves, valid_moves, "Expected moves dont match.")
 
 
-    # def test_generate_valid_moves_single_chip(self):
-    #     # Initialize the board with a single chip for player 1 in a playable position near the middle
-    #     self.game.board = np.array([
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],  # target at (3, 2) and (3, 4)
-    #         [3, 0, 3, 1, 3, 0, 3, 0],  # Chip in a playable position near the middle
-    #         [0, 3, 0, 3, 0, 3, 0, 3],
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3]
-    #     ])
-        
-    #     valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
-    #     self.assertEqual(len(valid_moves), 2, "There should be 2 valid moves for a single chip in a playable position near the middle.")
-        
-    #     # Verify the positions of the generated moves
-    #     expected_moves = [
-    #         [(4, 3, 3, 2)], [(4, 3, 3, 4)]
-    #     ]
-        
-    #     self.assertEqual(valid_moves, expected_moves, "Generated move not in expected positions.")
 
-    # def test_generate_valid_moves_single_crowned_chip(self):
-    #     # Initialize the board with a single crowned chip for player 1 in a playable position near the middle
-    #     self.game.board = np.array([
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3],  # target at (3, 2) and (3, 4)
-    #         [3, 0, 3, 2, 3, 0, 3, 0],  # Crowned chip in a playable position near the middle
-    #         [0, 3, 0, 3, 0, 3, 0, 3],  # target at (5, 2) and (5, 4)
-    #         [3, 0, 3, 0, 3, 0, 3, 0],
-    #         [0, 3, 0, 3, 0, 3, 0, 3]
-    #     ])
+    def test_generate_valid_moves_single_chip(self):
+        # Initialize the board with a single chip for player 1 in a playable position near the middle
+        self.game.board = np.array([
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],  # target at (3, 2) and (3, 4)
+            [3, 0, 3, 1, 3, 0, 3, 0],  # Chip in a playable position near the middle
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3]
+        ])
         
-    #     valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
-    #     self.assertEqual(len(valid_moves), 4, "There should be 4 valid moves for a crowned chip in a playable position near the middle.")
-    #     # Verify the positions of the generated moves
-    #     expected_moves = [[(4, 3, 3, 2)], [(4, 3, 3, 4)], [(4, 3, 5, 2)], [(4, 3, 5, 4)]]
-    #     self.assertEqual(valid_moves, expected_moves, "Generated move not in expected positions.")
+        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        self.assertEqual(len(valid_moves), 2, "There should be 2 valid moves for a single chip in a playable position near the middle.")
+        
+        # Verify the positions of the generated moves
+        expected_moves = [
+            [(4, 3, 3, 2)], [(4, 3, 3, 4)]
+        ]
+        
+        self.assertEqual(valid_moves, expected_moves, "Generated move not in expected positions.")
+
+    def test_generate_valid_moves_single_crowned_chip(self):
+        # Initialize the board with a single crowned chip for player 1 in a playable position near the middle
+        self.game.board = np.array([
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],  # target at (3, 2) and (3, 4)
+            [3, 0, 3, 2, 3, 0, 3, 0],  # Crowned chip in a playable position near the middle
+            [0, 3, 0, 3, 0, 3, 0, 3],  # target at (5, 2) and (5, 4)
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3]
+        ])
+        
+        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        self.assertEqual(len(valid_moves), 4, "There should be 4 valid moves for a crowned chip in a playable position near the middle.")
+        # Verify the positions of the generated moves
+        expected_moves = [[(4, 3, 3, 2)], [(4, 3, 3, 4)], [(4, 3, 5, 2)], [(4, 3, 5, 4)]]
+        self.assertEqual(valid_moves, expected_moves, "Generated move not in expected positions.")
     
     def test_generate_valid_moves_capture(self):
         self.game = CheckersTraining()

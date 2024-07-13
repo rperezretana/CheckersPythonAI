@@ -19,7 +19,7 @@ class CheckersNN:
             tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(1, activation='linear')
         ])
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
         return model
     
     def train(self, x, y):
@@ -33,5 +33,5 @@ class CheckersNN:
         self.model.save(path)
     
     def load(self, path):
-        self.model = tf.keras.models.load_model(path)
-        self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        self.model = tf.keras.models.load_model(path, compile=False)
+        self.model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])

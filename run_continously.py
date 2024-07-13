@@ -1,5 +1,4 @@
 import ctypes
-import time
 
 from CheckersTraining import CheckersTraining
 
