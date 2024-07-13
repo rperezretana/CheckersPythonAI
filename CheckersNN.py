@@ -13,12 +13,17 @@ class CheckersNN:
             tf.keras.layers.InputLayer(input_shape=(65,)),
             tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(1, activation='linear')
         ])
         model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
         return model
     
     def train(self, x, y):
+        x = x.reshape(-1, 65)
         self.model.fit(x, y, epochs=1, verbose=0)
 
     def predict(self, x):
@@ -29,3 +34,4 @@ class CheckersNN:
     
     def load(self, path):
         self.model = tf.keras.models.load_model(path)
+        self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
