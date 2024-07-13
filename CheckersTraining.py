@@ -73,13 +73,22 @@ class CheckersTraining(CheckersGame):
                 dst = os.path.join(self.save_directory, f"checkers_model{i+1}.h5")
                 if os.path.exists(src):
                     os.rename(src, dst)
-            self.nn.save_model(os.path.join(self.save_directory, "checkers_model.h5"))
+            
+            src = os.path.join(self.save_directory, f"checkers_model.h5")
+            dst = os.path.join(self.save_directory, f"checkers_model1.h5")
+            if os.path.exists(src):
+                os.rename(src, dst)
+            self.nn.save_model(dst)
             print(f"Model saved after {game_count} games.")
 
     def run_simulation(self):
         print(f"Started in debug mode: {DEBUG_ON} ")
         total_games = 0
         while True:
+            print(f"************************************")
+            print(f"Player 1 score: {self.player1_score}")
+            print(f"Player -1 score: {self.player2_score}")
+            print(f"Total moves: {self.total_moves}")
             print(f"Total Games played: {total_games}")
             self.board = self.initialize_board()
             plays_from_players = {
