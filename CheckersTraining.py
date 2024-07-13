@@ -15,6 +15,7 @@ class CheckersTraining(CheckersGame):
     def __init__(self):
         super().__init__()
         self.save_interval = 10
+        self.total_games = 0
         self.save_directory = "model_saves"
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
@@ -78,18 +79,23 @@ class CheckersTraining(CheckersGame):
             dst = os.path.join(self.save_directory, f"checkers_model1.h5")
             if os.path.exists(src):
                 os.rename(src, dst)
-            self.nn.save_model(dst)
+            self.nn.save_model(src)
             print(f"Model saved after {game_count} games.")
+
+
+    def save_status(self):
+        print(f"************************************")
+        print(f"Total moves: {self.total_moves}")
+        print(f"Player 1 score: {self.player1_score}")
+        print(f"Player -1 score: {self.player2_score}")
+        print(f"Total Games played: {self.total_games}")
+        dst = os.path.join(self.save_directory, f"game_status.txt")
+
 
     def run_simulation(self):
         print(f"Started in debug mode: {DEBUG_ON} ")
-        total_games = 0
         while True:
-            print(f"************************************")
-            print(f"Player 1 score: {self.player1_score}")
-            print(f"Player -1 score: {self.player2_score}")
-            print(f"Total moves: {self.total_moves}")
-            print(f"Total Games played: {total_games}")
+            self.save_status()
             self.board = self.initialize_board()
             plays_from_players = {
                 1: [],
