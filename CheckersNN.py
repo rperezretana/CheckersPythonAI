@@ -24,7 +24,7 @@ class CheckersNN:
     
     def train(self, x, y):
         x = x.reshape(-1, 65)
-        self.model.fit(x, y, epochs=1, verbose=0)
+        self.model.fit(x, y, epochs=10, verbose=0)
 
     def predict(self, x):
         return self.model.predict(x)

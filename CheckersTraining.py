@@ -1,8 +1,9 @@
 import math
+import random
 import time
 import numpy as np
 import os
-from CheckersGame import CheckersGame, debug_print, DEBUG_ON
+from CheckersGame import RANDOM_PLAY, CheckersGame, debug_print, DEBUG_ON
 from CheckersNN import CheckersNN
 import tensorflow as tf
 
@@ -13,11 +14,12 @@ class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
-        self.nn = CheckersNN()  # Initialize neural network
         self.save_interval = 10
         self.save_directory = "model_saves"
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
+        self.nn = CheckersNN()  # Initialize neural network
+        self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
 
     def simulate_play_on_board(self, board, move, player):
         new_board = self.update_score_and_board(move, player, board)
@@ -38,7 +40,7 @@ class CheckersTraining(CheckersGame):
             res = -self.player2_score if player == 1 else self.player2_score
         else:
             return -50
-        return res * 100
+        return res * 10
 
     def have_nn_select_moves(self, valid_moves, player):
         best_percentage = -math.inf 
@@ -53,6 +55,13 @@ class CheckersTraining(CheckersGame):
                 best_move = current_move
                 best_percentage = score_move_percentage
         return best_move, flat_board_with_player
+    
+    def select_random_play(self, valid_moves, player):
+        chosen_move = random.choice(valid_moves)
+        new_board = self.board.copy()
+        flat_board = self.simulate_play_on_board(new_board, chosen_move, player)
+        flat_board_with_player = np.array([player] + flat_board.tolist()).reshape(1, -1)
+        return chosen_move, flat_board_with_player
 
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0:
@@ -64,7 +73,6 @@ class CheckersTraining(CheckersGame):
                 dst = os.path.join(self.save_directory, f"checkers_model{i+1}.h5")
                 if os.path.exists(src):
                     os.rename(src, dst)
-            self.nn.save_model(os.path.join(self.save_directory, "checkers_model1.h5"))
             self.nn.save_model(os.path.join(self.save_directory, "checkers_model.h5"))
             print(f"Model saved after {game_count} games.")
 
@@ -94,7 +102,10 @@ class CheckersTraining(CheckersGame):
                     debug_print(f"Total moves: {self.total_moves}")
                     break
 
-                chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
+                if RANDOM_PLAY:
+                    chosen_move, flat_board_with_player = self.select_random_play(valid_moves, player)
+                else:
+                    chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
                 if not chosen_move:
                     raise ("There is a problem, no move was chosen.")
                 
@@ -127,13 +138,13 @@ class CheckersTraining(CheckersGame):
                     debug_print(f"Total moves: {self.total_moves}")
                     break
 
-            if self.player1_score != self.player2_score:
-                for play in plays_from_players[1]:
-                    reward = self.calculate_reward(1)
-                    self.nn.train(np.array(play), np.array([reward]))
-                for play in plays_from_players[-1]:
-                    reward = self.calculate_reward(-1)
-                    self.nn.train(np.array(play), np.array([reward]))
+            self.update_game_scores()
+            for play in plays_from_players[1]:
+                reward = self.calculate_reward(1)
+                self.nn.train(np.array(play), np.array([reward]))
+            for play in plays_from_players[-1]:
+                reward = self.calculate_reward(-1)
+                self.nn.train(np.array(play), np.array([reward]))
 
             self.save_model_periodically(total_games)
 

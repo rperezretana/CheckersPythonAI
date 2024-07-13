@@ -2,6 +2,7 @@ import numpy as np
 
 DEBUG_ON = False # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
+RANDOM_PLAY =  True # This activates the random play, so the NN learns from randomness first
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
@@ -12,7 +13,17 @@ def debug_print(*args, end=None):
 
 class CheckersGame:
     def __init__(self):
+        self.blank_board = None
+        
+        # Define the initial checkers board setup
+        self.blank_board = np.zeros((8, 8), dtype=int)
+        # Mark non-playable tiles with 3
+        for row in range(8):
+            for col in range(8):
+                if (row + col) % 2 == 0:
+                    self.blank_board[row, col] = 3
         self.board = self.initialize_board()
+        
 
     def initialize_board(self):
         self.bodies_of_captures = set() # used to represent recently captured positions on the UI.
@@ -29,13 +40,6 @@ class CheckersGame:
         self.move_limit = 200  # Hard limit for the total number of moves
         self.previous_boards = []  # List to track the last N board states
         self.total_moves += 1
-        # Define the initial checkers board setup
-        board = np.zeros((8, 8), dtype=int)
-        # Mark non-playable tiles with 3
-        for row in range(8):
-            for col in range(8):
-                if (row + col) % 2 == 0:
-                    board[row, col] = 3
         """
         Visualization of the matrix after this step:
         [
@@ -49,7 +53,7 @@ class CheckersGame:
             [0, 3, 0, 3, 0, 3, 0, 3],  # 7
         ]
         """
-        return board
+        return self.blank_board.copy()
     
     def place_players_chips(self):
         # Place initial pieces (1 for player, -1 for opponent)
