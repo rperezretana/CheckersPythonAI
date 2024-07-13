@@ -6,6 +6,8 @@ import os
 from CheckersGame import RANDOM_PLAY, CheckersGame, debug_print, DEBUG_ON
 from CheckersNN import CheckersNN
 import tensorflow as tf
+import json
+
 
 
 tf.compat.v1.enable_eager_execution()
@@ -14,13 +16,14 @@ class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
-        self.save_interval = 10
+        self.save_interval = 3
         self.total_games = 0
         self.save_directory = "model_saves"
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
         self.nn = CheckersNN()  # Initialize neural network
         self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
+        self.load_total_games()
 
     def simulate_play_on_board(self, board, move, player):
         new_board = self.update_score_and_board(move, player, board)
@@ -89,8 +92,19 @@ class CheckersTraining(CheckersGame):
         print(f"Player 1 score: {self.player1_score}")
         print(f"Player -1 score: {self.player2_score}")
         print(f"Total Games played: {self.total_games}")
-        dst = os.path.join(self.save_directory, f"game_status.txt")
+        self.save_total_games()
 
+    def save_total_games(self):
+        status_file = os.path.join(self.save_directory, "game_status.json")
+        with open(status_file, 'w') as file:
+            json.dump({"total_games": self.total_games}, file)
+
+    def load_total_games(self):
+        status_file = os.path.join(self.save_directory, "game_status.json")
+        if os.path.exists(status_file):
+            with open(status_file, 'r') as file:
+                data = json.load(file)
+                self.total_games = data.get("total_games", 0)
 
     def run_simulation(self):
         print(f"Started in debug mode: {DEBUG_ON} ")
@@ -101,8 +115,7 @@ class CheckersTraining(CheckersGame):
                 1: [],
                 -1: []
             }
-            self.place_players_chips()
-            total_games += 1
+            self.total_games += 1
             player = 1  # Start with player 1
             debug_print("Current Board:")
             self.print_board()  # Print the board for debugging
@@ -136,7 +149,7 @@ class CheckersTraining(CheckersGame):
                 debug_print(f"Player 1 score: {self.player1_score}")
                 debug_print(f"Player -1 score: {self.player2_score}")
                 debug_print(f"Total moves: {self.total_moves}")
-                debug_print(f"Total Games played: {total_games}")
+                debug_print(f"Total Games played: {self.total_games}")
                 if DEBUG_ON:
                     time.sleep(1)
 
@@ -161,7 +174,7 @@ class CheckersTraining(CheckersGame):
                 reward = self.calculate_reward(-1)
                 self.nn.train(np.array(play), np.array([reward]))
 
-            self.save_model_periodically(total_games)
+            self.save_model_periodically(self.total_games)
 
 if __name__ == "__main__":
     game = CheckersTraining()

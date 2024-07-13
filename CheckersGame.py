@@ -1,8 +1,8 @@
 import numpy as np
 
-DEBUG_ON = False # set to false if not interested on the ouputs
+DEBUG_ON = True # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_PLAY =  True # This activates the random play, so the NN learns from randomness first
+RANDOM_PLAY =  False # This activates the random play, so the NN learns from randomness first
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
@@ -53,18 +53,17 @@ class CheckersGame:
             [0, 3, 0, 3, 0, 3, 0, 3],  # 7
         ]
         """
-        return self.blank_board.copy()
+        new_boad = self.blank_board.copy()
+        self.place_players_chips(new_boad)
+        return new_boad
     
-    def place_players_chips(self):
+    def place_players_chips(self, board):
         # Place initial pieces (1 for player, -1 for opponent)
-        self.board[0:3:2, 1::2] = -1
-        self.board[1:3:2, ::2] = -1
-        self.board[5:8:2, 0::2] = 1
-        self.board[6:8:2, 1::2] = 1
+        board[0:3:2, 1::2] = -1
+        board[1:3:2, ::2] = -1
+        board[5:8:2, 0::2] = 1
+        board[6:8:2, 1::2] = 1
 
-    def get_board_state(self):
-        # Flatten the board to a 1D array for the neural network input
-        return self.board
 
     def is_valid_transition(self, current_board, new_board, from_pos, to_pos):
         """
