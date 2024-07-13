@@ -14,7 +14,7 @@ class CheckersTraining(CheckersGame):
     def __init__(self):
         super().__init__()
         self.nn = CheckersNN()  # Initialize neural network
-        self.save_interval = 50
+        self.save_interval = 10
         self.save_directory = "model_saves"
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
@@ -27,12 +27,15 @@ class CheckersTraining(CheckersGame):
         """
         The reward is proportional to the success of the game,
         so a game won with multiple chips will be consider even better.
+        A losing player will be punished proportionally to the points its opponent got
+        And rewarded proprotionally to the points the player got.
+        ties are slighly punished
         """
         res = 0
         if self.player1_score > self.player2_score:
-            res = self.player1_score if player == 1 else -self.player2_score
+            res = self.player1_score if player == 1 else -self.player1_score
         elif self.player1_score < self.player2_score:
-            res = -self.player1_score if player == 1 else self.player2_score
+            res = -self.player2_score if player == 1 else self.player2_score
         else:
             return -50
         return res * 100
@@ -54,6 +57,8 @@ class CheckersTraining(CheckersGame):
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0:
             # Rotate the saved models
+            if os.path.exists(os.path.join(self.save_directory,'checkers_model5.h5')):
+                os.remove(os.path.join(self.save_directory,'checkers_model5.h5'))
             for i in range(4, 0, -1):
                 src = os.path.join(self.save_directory, f"checkers_model{i}.h5")
                 dst = os.path.join(self.save_directory, f"checkers_model{i+1}.h5")
