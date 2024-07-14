@@ -95,8 +95,8 @@ class CheckersTraining(CheckersGame):
         return chosen_move, flat_board_with_player
 
     def save_model_periodically(self, game_count):
-        self.executor.submit(self.save_status)
         if game_count % self.save_interval == 0:
+            self.executor.submit(self.save_status)
             self.executor.submit(self._save_model)
 
 
