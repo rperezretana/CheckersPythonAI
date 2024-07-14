@@ -2,7 +2,7 @@ import numpy as np
 
 DEBUG_ON = True # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_PLAY = True # This activates the random play, so the NN learns from randomness first
+RANDOM_PLAY = False # This activates the random play, so the NN learns from randomness first
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
@@ -15,8 +15,6 @@ class CheckersGame:
     def __init__(self):
         self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
         self.transition_memo = {}  # Memo dictionary for is_valid_transition
-        self.blank_board = None
-        
         # Define the initial checkers board setup
         self.blank_board = np.zeros((8, 8), dtype=int)
         # Mark non-playable tiles with 3
@@ -24,6 +22,7 @@ class CheckersGame:
             for col in range(8):
                 if (row + col) % 2 == 0:
                     self.blank_board[row, col] = 3
+        self.place_players_chips(self.blank_board)
         self.board = self.initialize_board()
         
 
@@ -53,9 +52,7 @@ class CheckersGame:
             [0, 3, 0, 3, 0, 3, 0, 3],  # 7
         ]
         """
-        new_boad = self.blank_board.copy()
-        self.place_players_chips(new_boad)
-        return new_boad
+        return self.blank_board.copy()
     
     def place_players_chips(self, board):
         # Place initial pieces (1 for player, -1 for opponent)
@@ -78,6 +75,10 @@ class CheckersGame:
         Returns:
         bool: True if the transition is valid, False otherwise.
         """
+        key = f"{current_board} - {new_board} - {from_pos}-{to_pos}"
+        if key in self.transition_memo:
+            return self.transition_memo[key]
+
         current_board = current_board.reshape((8, 8))
         new_board = new_board.reshape((8, 8))
         
@@ -91,6 +92,7 @@ class CheckersGame:
         # Check if the piece at the from position has moved to the to position
         if not self.check_move_to_position(new_board, from_pos, to_pos, expected_piece_at_to_pos):
             debug_print("Invalid move: piece at from_pos did not move to to_pos correctly")
+            self.transition_memo[key] = False
             return False
         
         row_diff = to_pos[0] - from_pos[0]
@@ -98,17 +100,24 @@ class CheckersGame:
         
         # Simple move
         if abs(row_diff) == 1 and abs(col_diff) == 1:
-            return self.check_simple_move(new_board, from_pos, to_pos, expected_piece_at_to_pos)
+            res = self.check_simple_move(new_board, from_pos, to_pos, expected_piece_at_to_pos)
+            self.transition_memo[key] = res
+            return res
         
         # Capturing move
         if abs(row_diff) == 2 and abs(col_diff) == 2:
-            return self.check_capturing_move(current_board, new_board, from_pos, to_pos, piece)
+            res = self.check_capturing_move(current_board, new_board, from_pos, to_pos, piece)
+            self.transition_memo[key] = res
+            return res
         
         # Multiple captures
         if abs(row_diff) > 2 or abs(col_diff) > 2:
-            return self.check_multiple_captures(current_board, new_board, from_pos, to_pos, piece)
+            res = self.check_multiple_captures(current_board, new_board, from_pos, to_pos, piece)
+            self.transition_memo[key] = res
+            return res
         
         debug_print("Invalid move: not a valid single, capturing, or multiple capture move")
+        self.transition_memo[key] = False
         return False
 
     def check_move_to_position(self, new_board, from_pos, to_pos, expected_piece_at_to_pos):
@@ -226,6 +235,9 @@ class CheckersGame:
 
 
     def generate_valid_moves(self, board, player):
+        key = f"{player} - {self.board}"
+        if key in self.valid_moves_memo:
+            return self.valid_moves_memo[key]
         capturing_moves = []
         non_capturing_moves = []
         
@@ -237,7 +249,9 @@ class CheckersGame:
                     if not capturing_moves:
                         self.find_all_non_capturing_moves(board, row, col, player, non_capturing_moves)
         
-        return capturing_moves if capturing_moves else non_capturing_moves
+        res = capturing_moves if capturing_moves else non_capturing_moves
+        self.valid_moves_memo[key] = res
+        return res
 
 
     def get_directions_for_piece_during_capture(self, board, row, col, player):
@@ -309,7 +323,7 @@ class CheckersGame:
                 elif piece == 0:
                     c = ' '
                     if f"{row}_{col}" in self.bodies_of_captures:
-                        c = 'X'
+                        c = '☠'
                     char = f'\033[47m \033[47m{c} \033[0m'  # White square
                 elif piece == 1:
                     char = '\033[42m \033[42mO \033[0m'  # Green square (player 1)

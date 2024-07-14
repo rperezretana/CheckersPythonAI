@@ -15,3 +15,5 @@ try:
 finally:
     # Restore the original state when done
     ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+
+
