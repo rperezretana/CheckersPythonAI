@@ -1,8 +1,8 @@
 import numpy as np
 
-DEBUG_ON = True # set to false if not interested on the ouputs
+DEBUG_ON = False # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_PLAY = False # This activates the random play, so the NN learns from randomness first
+RANDOM_AFTER_PLAYS = 12 # This activates the random play, so the NN learns from randomness first
     
 def debug_print(*args, end=None):
     if DEBUG_ON:

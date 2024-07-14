@@ -3,10 +3,11 @@ import random
 import time
 import numpy as np
 import os
-from CheckersGame import RANDOM_PLAY, CheckersGame, debug_print, DEBUG_ON
+from CheckersGame import RANDOM_AFTER_PLAYS, CheckersGame, debug_print, DEBUG_ON, RANDOM_AFTER_PLAYS
 from CheckersNN import CheckersNN
 import tensorflow as tf
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 
 
@@ -18,6 +19,7 @@ class CheckersTraining(CheckersGame):
         super().__init__()
         self.save_interval = 10
         self.total_games = 0
+        self.tie_detected = False
         self.save_directory = "model_saves"
         self.predicted_player1 = 0
         self.predicted_player2 = 0
@@ -25,7 +27,9 @@ class CheckersTraining(CheckersGame):
             os.makedirs(self.save_directory)
         self.nn = CheckersNN()  # Initialize neural network
         self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
-        self.load_total_games()
+        self.monte_carlo_scoring = dict()
+        self.executor = ThreadPoolExecutor(max_workers=1)  # Create an executor for asynchronous tasks
+
 
     def simulate_play_on_board(self, board, move, player):
         new_board = self.update_score_and_board(move, player, board)
@@ -39,13 +43,15 @@ class CheckersTraining(CheckersGame):
         And rewarded proprotionally to the points the player got.
         ties are slighly punished
         """
+        if self.tie_detected:
+            return -50  # slight penalization on tie
         res = 0
         if self.player1_score > self.player2_score:
             res = self.player1_score if player == 1 else -self.player1_score
         elif self.player1_score < self.player2_score:
             res = -self.player2_score if player == 1 else self.player2_score
         else:
-            return -50
+            return -5
         return res * 10
 
     def filter_and_flatten_board(self, board, player):
@@ -70,6 +76,9 @@ class CheckersTraining(CheckersGame):
             if best_percentage < score_move_percentage:
                 best_move = current_move
                 best_percentage = score_move_percentage
+            elif best_percentage == score_move_percentage:
+                best_move = random.choice([best_move, current_move])
+                best_percentage = score_move_percentage
         if player == -1:
             self.predicted_player1 = best_percentage
         else:
@@ -86,23 +95,28 @@ class CheckersTraining(CheckersGame):
         return chosen_move, flat_board_with_player
 
     def save_model_periodically(self, game_count):
-        self.save_status()
+        self.executor.submit(self.save_status)
         if game_count % self.save_interval == 0:
-            # Rotate the saved models
-            if os.path.exists(os.path.join(self.save_directory,'checkers_model5.h5')):
-                os.remove(os.path.join(self.save_directory,'checkers_model5.h5'))
-            for i in range(4, 0, -1):
-                src = os.path.join(self.save_directory, f"checkers_model{i}.h5")
-                dst = os.path.join(self.save_directory, f"checkers_model{i+1}.h5")
-                if os.path.exists(src):
-                    os.rename(src, dst)
-            
-            src = os.path.join(self.save_directory, f"checkers_model.h5")
-            dst = os.path.join(self.save_directory, f"checkers_model1.h5")
+            self.executor.submit(self._save_model)
+
+
+    def _save_model(self):
+        # Rotate the saved models
+        if os.path.exists(os.path.join(self.save_directory,'checkers_model5.h5')):
+            os.remove(os.path.join(self.save_directory,'checkers_model5.h5'))
+        for i in range(4, 0, -1):
+            src = os.path.join(self.save_directory, f"checkers_model{i}.h5")
+            dst = os.path.join(self.save_directory, f"checkers_model{i+1}.h5")
             if os.path.exists(src):
                 os.rename(src, dst)
-            self.nn.save_model(src)
-            print(f"Model saved after {game_count} games.")
+        
+        src = os.path.join(self.save_directory, f"checkers_model.h5")
+        dst = os.path.join(self.save_directory, f"checkers_model1.h5")
+        if os.path.exists(src):
+            os.rename(src, dst)
+        self.nn.save_model(src)
+        print(f"Model saved after {self.total_games} games.")
+
 
 
     def save_status(self):
@@ -111,13 +125,13 @@ class CheckersTraining(CheckersGame):
         print(f"Player 1 score: {self.player1_score}")
         print(f"Player -1 score: {self.player2_score}")
         print(f"Total Games played: {self.total_games}")
-        self.save_total_games()
 
         dst = os.path.join(self.save_directory, f"game_status.json")
         status = {
             'total_games': self.total_games,
             'valid_moves_memo': list(self.valid_moves_memo.items()),  # Convert to list for JSON
-            'transition_memo': list(self.transition_memo.items())  # Convert to list for JSON
+            'transition_memo': list(self.transition_memo.items()),  # Convert to list for JSON
+            'monte_carlo_scoring': dict(self.monte_carlo_scoring)
         }
         with open(dst, 'w') as f:
             json.dump(status, f)
@@ -131,18 +145,18 @@ class CheckersTraining(CheckersGame):
                 self.total_games = status.get('total_games', 0)
                 self.valid_moves_memo = dict(status.get('valid_moves_memo', []))
                 self.transition_memo = dict(status.get('transition_memo', []))
+                self.monte_carlo_scoring =  dict(status.get('monte_carlo_scoring', []))
 
-    def save_total_games(self):
-        status_file = os.path.join(self.save_directory, "game_status.json")
-        with open(status_file, 'w') as file:
-            json.dump({"total_games": self.total_games}, file)
 
-    def load_total_games(self):
-        status_file = os.path.join(self.save_directory, "game_status.json")
-        if os.path.exists(status_file):
-            with open(status_file, 'r') as file:
-                data = json.load(file)
-                self.total_games = data.get("total_games", 0)
+    def update_reward_monte_carlo_score(self, inputs, reward):
+        # inputs normally shaped as flat_board_with_player
+        state = f"{inputs}"
+        reward = reward / 100
+        if state in self.monte_carlo_scoring:
+            self.monte_carlo_scoring[state]+=reward
+        else:
+            self.monte_carlo_scoring[state]=reward
+
 
     def run_simulation(self):
         self.load_status()
@@ -154,15 +168,16 @@ class CheckersTraining(CheckersGame):
                 -1: []
             }
             self.total_games += 1
-            player = 1  # Start with player 1
+            player = random.choice([1, -1]) # Start with random player
             debug_print("Current Board:")
             self.print_board()  # Print the board for debugging
+            self.tie_detected = False
             while True:
                 valid_moves = self.generate_valid_moves(self.board, player)
                 if not valid_moves:
                     break
 
-                if RANDOM_PLAY:
+                if RANDOM_AFTER_PLAYS > self.total_moves:
                     chosen_move, flat_board_with_player = self.select_random_play(valid_moves, player)
                 else:
                     chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
@@ -173,6 +188,7 @@ class CheckersTraining(CheckersGame):
                 self.update_score_and_board(chosen_move, player)
                 
                 if self.detect_loop():
+                    self.tie_detected = True
                     debug_print("Loop detected. Game ends in a tie.")
                     debug_print(f"Total moves: {self.total_moves}")
                     break
@@ -205,16 +221,17 @@ class CheckersTraining(CheckersGame):
             debug_print(f"Player -1 moves: {self.player2_moves}")
             debug_print(f"Player 1 score: {self.player1_score}")
             debug_print(f"Player -1 score: {self.player2_score}")
-            debug_print(f"Total moves: {self.total_moves}")
 
             reward = self.calculate_reward(1)
             print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
+                self.update_reward_monte_carlo_score(play, reward)
                 self.nn.train(np.array(play), np.array([reward]))
             
             reward = self.calculate_reward(-1)
             print(f"Delivering reward for P{-1}: {reward}")
             for play in plays_from_players[-1]:
+                self.update_reward_monte_carlo_score(play, reward)
                 self.nn.train(np.array(play), np.array([reward]))
 
             self.save_model_periodically(self.total_games)
