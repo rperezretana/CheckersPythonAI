@@ -3,7 +3,7 @@ import random
 import time
 import numpy as np
 import os
-from CheckersGame import RANDOM_AFTER_PLAYS, CheckersGame, debug_print, DEBUG_ON, RANDOM_AFTER_PLAYS
+from CheckersGame import PLAYER_1_ENGINE, PLAYER_2_ENGINE, RANDOM_FIRST_PLAYS, CheckersGame, Engines, debug_print, DEBUG_ON, RANDOM_FIRST_PLAYS
 from CheckersNN import CheckersNN
 import tensorflow as tf
 import json
@@ -29,6 +29,9 @@ class CheckersTraining(CheckersGame):
         self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
         self.monte_carlo_scoring = dict()
         self.executor = ThreadPoolExecutor(max_workers=1)  # Create an executor for asynchronous tasks
+        self.player_1_win_count = 0
+        self.player_2_win_count = 0
+        self.tie_games = 0
 
 
     def simulate_play_on_board(self, board, move, player):
@@ -148,6 +151,36 @@ class CheckersTraining(CheckersGame):
                 self.monte_carlo_scoring =  dict(status.get('monte_carlo_scoring', []))
 
 
+    def have_mc_select_moves(self, valid_moves, player):
+        best_percentage = -math.inf 
+        best_move = None
+        flat_board_with_player = None
+        for current_move in valid_moves:
+            new_board = self.board.copy()
+            flat_board = self.simulate_play_on_board(new_board, current_move, player)
+            flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
+            state = f"{flat_board_with_player}"
+            if state in self.monte_carlo_scoring:
+                score_move_percentage = self.monte_carlo_scoring[state]
+            else:
+                score_move_percentage = 0
+            debug_print(f"Predicted: {score_move_percentage} for {flat_board_with_player}")
+            if best_percentage < score_move_percentage:
+                best_move = current_move
+                best_percentage = score_move_percentage
+            elif best_percentage == score_move_percentage:
+                # choses random, mostly useful if they are unknown zeros
+                best_move = random.choice([best_move, current_move])
+                best_percentage = score_move_percentage
+        if player == -1:
+            self.predicted_player1 = best_percentage
+        else:
+            self.predicted_player2 = best_percentage
+        debug_print(f"Predicted: {self.predicted_player1} - player 1")
+        debug_print(f"Predicted: {self.predicted_player2} - player -1")
+        return best_move, flat_board_with_player
+
+
     def update_reward_monte_carlo_score(self, inputs, reward):
         # inputs normally shaped as flat_board_with_player
         state = f"{inputs}"
@@ -158,9 +191,32 @@ class CheckersTraining(CheckersGame):
             self.monte_carlo_scoring[state]=reward
 
 
+    def play_with_selected_engine(self, valid_moves, player):
+        if RANDOM_FIRST_PLAYS > self.total_moves:
+            return self.select_random_play(valid_moves, player)
+        if player == 1:
+            if PLAYER_1_ENGINE == Engines.MC:
+                return self.have_mc_select_moves(valid_moves, player)
+            elif PLAYER_1_ENGINE == Engines.NN:
+                return self.have_nn_select_moves(valid_moves, player)
+            else:
+                return self.select_random_play(valid_moves, player)
+        if player == -1:
+            if PLAYER_2_ENGINE == Engines.MC:
+                return self.have_mc_select_moves(valid_moves, player)
+            elif PLAYER_2_ENGINE == Engines.NN:
+                return self.have_nn_select_moves(valid_moves, player)
+            else:
+                return self.select_random_play(valid_moves, player)
+        return None, None
+
+
     def run_simulation(self):
         self.load_status()
         print(f"Started in debug mode: {DEBUG_ON} ")
+        self.player_1_score = 0
+        self.player_2_score = 0
+        self.tie_games = 0
         while True:
             self.board = self.initialize_board()
             plays_from_players = {
@@ -177,10 +233,7 @@ class CheckersTraining(CheckersGame):
                 if not valid_moves:
                     break
 
-                if RANDOM_AFTER_PLAYS > self.total_moves:
-                    chosen_move, flat_board_with_player = self.select_random_play(valid_moves, player)
-                else:
-                    chosen_move, flat_board_with_player = self.have_nn_select_moves(valid_moves, player)
+                chosen_move, flat_board_with_player =  self.play_with_selected_engine(valid_moves, player)
                 if not chosen_move:
                     raise ("There is a problem, no move was chosen.")
                 
@@ -194,11 +247,12 @@ class CheckersTraining(CheckersGame):
                     break
 
                 self.print_board()
-                debug_print(f"Player 1 score: {self.player1_score}")
-                debug_print(f"Player -1 score: {self.player2_score}")
+                debug_print(f"Player 1 score: {self.player1_score} ({PLAYER_1_ENGINE})")
+                debug_print(f"Player -1 score: {self.player2_score} ({PLAYER_2_ENGINE})")
                 debug_print(f"Total moves: {self.total_moves}")
                 debug_print(f"Total Games played: {self.total_games}")
                 if DEBUG_ON:
+                    self.update_game_scores()
                     time.sleep(1)
 
                 if player == 1:
@@ -223,6 +277,14 @@ class CheckersTraining(CheckersGame):
             debug_print(f"Player -1 score: {self.player2_score}")
 
             reward = self.calculate_reward(1)
+            if self.player1_score > self.player2_score:
+                self.player_1_win_count += 1
+            elif self.player1_score < self.player2_score:
+                self.player_2_win_count += 1
+            else:
+                self.tie_games += 1
+
+            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}  ({PLAYER_2_ENGINE}) - Tie {self.tie_games}")
             print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
                 self.update_reward_monte_carlo_score(play, reward)

@@ -1,8 +1,18 @@
+from enum import Enum
 import numpy as np
+
+class Engines(Enum):
+    NN = 1  # Neural network
+    MC = 2  # Monte Carlo
+    RANDOM = 3 # Random
 
 DEBUG_ON = False # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_AFTER_PLAYS = 12 # This activates the random play, so the NN learns from randomness first
+RANDOM_FIRST_PLAYS = 2 # This activates the random play, so the NN learns from randomness first
+PLAYER_1_ENGINE = Engines.NN
+PLAYER_2_ENGINE = Engines.MC # -1
+
+
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
