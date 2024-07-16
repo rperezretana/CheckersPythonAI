@@ -48,15 +48,15 @@ class CheckersTraining(CheckersGame):
         And rewarded proprotionally to the points the player got.
         ties are slighly punished
         """
-        if self.tie_detected:
-            return -50 - self.total_moves  # slight penalization on tie
+        if  self.player1_score == self.player2_score:
+            return -10 - self.total_moves  # slight penalization on tie
         res = 0
         if self.player1_score > self.player2_score:
             res = self.player1_score if player == 1 else -self.player1_score
         elif self.player1_score < self.player2_score:
             res = -self.player2_score if player == 1 else self.player2_score
         else:
-            res = -5
+            res = -1
         return (res * 10) - self.total_moves # moves become a penalizing factor, the longer the game takes the more it is punished
 
     def filter_and_flatten_board(self, board, player):
@@ -242,6 +242,8 @@ class CheckersTraining(CheckersGame):
                 
                 plays_from_players[player].append(flat_board_with_player)
                 self.update_score_and_board(chosen_move, player)
+
+                self.update_reward_monte_carlo_score(flat_board_with_player, self.calculate_reward(player))
                 
                 if self.detect_loop():
                     self.tie_detected = True
