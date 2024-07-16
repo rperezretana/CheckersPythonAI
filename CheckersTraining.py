@@ -34,6 +34,7 @@ class CheckersTraining(CheckersGame):
         self.player_2_win_count = 0
         self.tie_games = 0
         self.new_branches_created = 0
+        self.old_branches_updated = 0
 
 
     def simulate_play_on_board(self, board, move, player):
@@ -49,14 +50,12 @@ class CheckersTraining(CheckersGame):
         ties are slighly punished
         """
         if  self.player1_score == self.player2_score:
-            return -10 - self.total_moves  # slight penalization on tie
+            return -self.total_moves  # slight penalization on tie
         res = 0
         if self.player1_score > self.player2_score:
             res = self.player1_score if player == 1 else -self.player1_score
         elif self.player1_score < self.player2_score:
             res = -self.player2_score if player == 1 else self.player2_score
-        else:
-            res = -1
         return (res * 10) - self.total_moves # moves become a penalizing factor, the longer the game takes the more it is punished
 
     def filter_and_flatten_board(self, board, player):
@@ -188,6 +187,7 @@ class CheckersTraining(CheckersGame):
         reward = reward / 100
         if state in self.monte_carlo_scoring:
             self.monte_carlo_scoring[state]+=reward
+            self.old_branches_updated += 1
         else:
             self.monte_carlo_scoring[state]=reward
             self.new_branches_created += 1
@@ -221,6 +221,7 @@ class CheckersTraining(CheckersGame):
         self.tie_games = 0
         while True:
             self.new_branches_created = 0
+            self.old_branches_updated = 0
             self.board = self.initialize_board()
             plays_from_players = {
                 1: [],
@@ -251,12 +252,12 @@ class CheckersTraining(CheckersGame):
                     debug_print(f"Total moves: {self.total_moves}")
                     break
 
-                self.print_board()
-                debug_print(f"Player 1 score: {self.player1_score} ({PLAYER_1_ENGINE})")
-                debug_print(f"Player -1 score: {self.player2_score} ({PLAYER_2_ENGINE})")
-                debug_print(f"Total moves: {self.total_moves}")
-                debug_print(f"Total Games played: {self.total_games}")
                 if DEBUG_ON:
+                    self.print_board()
+                    debug_print(f"Player 1 score: {self.player1_score} ({PLAYER_1_ENGINE})")
+                    debug_print(f"Player -1 score: {self.player2_score} ({PLAYER_2_ENGINE})")
+                    debug_print(f"Total moves: {self.total_moves}")
+                    debug_print(f"Total Games played: {self.total_games}")
                     self.update_game_scores()
                     time.sleep(1)
 
@@ -265,10 +266,11 @@ class CheckersTraining(CheckersGame):
                 else:
                     self.player2_moves += 1
 
-                player = -player  
+                player = -player  # reverse player playing
 
                 self.total_moves += 1
                 if self.total_moves >= self.move_limit:
+                    # self.tie_detected = True
                     debug_print("Move limit reached. Game ends in a tie.")
                     debug_print(f"Total moves: {self.total_moves}")
                     break
@@ -289,6 +291,9 @@ class CheckersTraining(CheckersGame):
             else:
                 self.tie_games += 1
 
+            # divided by 2 since update reward is caled twice
+            print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
+
             print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}  ({PLAYER_2_ENGINE}) - Tie {self.tie_games}")
             print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
@@ -301,12 +306,12 @@ class CheckersTraining(CheckersGame):
                 self.update_reward_monte_carlo_score(play, reward)
                 self.nn.train(np.array(play), np.array([reward]))
 
-            print(f"MC new branches: {self.new_branches_created}")
             self.save_model_periodically(self.total_games)
+
+
 
     
     def save_game_results(self):
-
         # Generate a random 5 characters string
         random_name = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
         print(f"Storing Training Data ...")

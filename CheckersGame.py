@@ -8,9 +8,9 @@ class Engines(Enum):
 
 DEBUG_ON = False # set to false if not interested on the ouputs
 TRAINING = True # set False if not interested on training the nn
-RANDOM_FIRST_PLAYS = 0 # This activates the random play for a few plays at the start of the game
-PLAYER_1_ENGINE = Engines.RANDOM
-PLAYER_2_ENGINE = Engines.MC # -1
+RANDOM_FIRST_PLAYS = 2 # This activates the random play for a few plays at the start of the game
+PLAYER_1_ENGINE = Engines.MC
+PLAYER_2_ENGINE = Engines.RANDOM # -1
 
 
     
