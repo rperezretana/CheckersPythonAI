@@ -8,6 +8,7 @@ from CheckersNN import CheckersNN
 import tensorflow as tf
 import json
 from concurrent.futures import ThreadPoolExecutor
+import string
 
 
 
@@ -32,6 +33,7 @@ class CheckersTraining(CheckersGame):
         self.player_1_win_count = 0
         self.player_2_win_count = 0
         self.tie_games = 0
+        self.new_branches_created = 0
 
 
     def simulate_play_on_board(self, board, move, player):
@@ -47,15 +49,15 @@ class CheckersTraining(CheckersGame):
         ties are slighly punished
         """
         if self.tie_detected:
-            return -50  # slight penalization on tie
+            return -50 - self.total_moves  # slight penalization on tie
         res = 0
         if self.player1_score > self.player2_score:
             res = self.player1_score if player == 1 else -self.player1_score
         elif self.player1_score < self.player2_score:
             res = -self.player2_score if player == 1 else self.player2_score
         else:
-            return -5
-        return res * 10
+            res = -5
+        return (res * 10) - self.total_moves # moves become a penalizing factor, the longer the game takes the more it is punished
 
     def filter_and_flatten_board(self, board, player):
         # Convert the board to a list of lists if it is a NumPy array
@@ -119,7 +121,6 @@ class CheckersTraining(CheckersGame):
             os.rename(src, dst)
         self.nn.save_model(src)
         print(f"Model saved after {self.total_games} games.")
-
 
 
     def save_status(self):
@@ -189,6 +190,7 @@ class CheckersTraining(CheckersGame):
             self.monte_carlo_scoring[state]+=reward
         else:
             self.monte_carlo_scoring[state]=reward
+            self.new_branches_created += 1
 
 
     def play_with_selected_engine(self, valid_moves, player):
@@ -218,6 +220,7 @@ class CheckersTraining(CheckersGame):
         self.player_2_score = 0
         self.tie_games = 0
         while True:
+            self.new_branches_created = 0
             self.board = self.initialize_board()
             plays_from_players = {
                 1: [],
@@ -296,7 +299,25 @@ class CheckersTraining(CheckersGame):
                 self.update_reward_monte_carlo_score(play, reward)
                 self.nn.train(np.array(play), np.array([reward]))
 
+            print(f"MC new branches: {self.new_branches_created}")
             self.save_model_periodically(self.total_games)
+
+    
+    def save_game_results(self):
+
+        # Generate a random 5 characters string
+        random_name = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
+        print(f"Storing Training Data ...")
+        status = {
+            'total_games': self.total_games,
+            'valid_moves_memo': list(self.valid_moves_memo.items()),  # Convert to list for JSON
+            'transition_memo': list(self.transition_memo.items()),  # Convert to list for JSON
+            'monte_carlo_scoring': dict(self.monte_carlo_scoring)
+        }
+        new_file = os.path.join(self.save_directory,f'{random_name}.json')
+        with open(new_file, 'w') as f:
+            json.dump(status, f)
+
 
 if __name__ == "__main__":
     game = CheckersTraining()
