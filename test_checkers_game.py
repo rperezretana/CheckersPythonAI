@@ -336,7 +336,6 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual(self.game.player2_score, 11, "Player -1's score should be updated to reflect the remaining pieces.")
 
 
-
     def test_diagonal_multiple_jumps_multiple_possible_ends(self):
         """
         There exist scenarios where multiple jumps over multiple tiles in checkers are valid, for instance,
@@ -379,6 +378,37 @@ class TestCheckersGame(unittest.TestCase):
         # Check if the score is updated correctly
         self.assertEqual(self.game.player1_score, 14, "Player 1's score should be updated to reflect the capture.")
         self.assertEqual(self.game.player2_score, 11, "Player -1's score should be updated to reflect the remaining pieces.")
+
+    def test_key_generator(self):
+        board_1 = np.array([
+            [3, 2, 3, 1, 3, 0, 3, 0],
+            [-1, 3, -2, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 1, 3, -2],
+            [0, 3, 0, 3, 2, 3, -1, 3]
+        ])
+        board_mirrored = np.array([
+            [3, 1, 3, -2, 3, 0, 3, 0],
+            [2, 3, -1, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 0, 3, 0],
+            [0, 3, 0, 3, 0, 3, 0, 3],
+            [3, 0, 3, 0, 3, 2, 3, 1],
+            [0, 3, 0, 3, -1, 3, -2, 3]
+        ])
+        result_1 = f"{self.game.filter_and_flatten_board(board_1, 1)}"
+        result_2 = f"{self.game.filter_and_flatten_board(board_mirrored, -1)}"
+        result_1 = self.game.clean_string(result_1)
+        result_2 = self.game.clean_string(result_2)
+        
+        self.assertEqual("-1-20001", self.game.mirror_play("1-10002"), "error reversing")
+        self.assertEqual("1-10002", self.game.mirror_play("-1-20001"), "error reversing")
+        self.assertEqual(result_2, self.game.mirror_play(result_1), "error reversing")
+        self.assertEqual(result_1, self.game.mirror_play(result_2), "error reversing")
 
 
 if __name__ == "__main__":

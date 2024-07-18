@@ -9,6 +9,7 @@ import tensorflow as tf
 import json
 from concurrent.futures import ThreadPoolExecutor
 import string
+import re
 
 
 
@@ -18,7 +19,7 @@ class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
-        self.save_interval = 10
+        self.save_interval = 50000 # when NN is not running this has to be a big number
         self.total_games = 0
         self.tie_detected = False
         self.save_directory = "model_saves"
@@ -97,11 +98,48 @@ class CheckersTraining(CheckersGame):
         flat_board = self.simulate_play_on_board(new_board, chosen_move, player)
         flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
         return chosen_move, flat_board_with_player
+    
+    def mirror_play(self, key):
+        # Extract the player number and the board configuration
+        # -board = self.clean_string(key) asssumed that it is already mirrored
+        player = 0 
+        if key[0] == '-':
+            player = int(key[0:2])*-1
+            key = key[2:] # remove player from the array
+        else:
+            player = int(key[0])*-1
+            key = key[1:] # remove player from the array
+        key = key.replace('-2', '8').replace('-1', '9') # replace negatives to not deal with signs
+        key = key[::-1] # reverse string
+        key = key.replace('2', '-2').replace('1', '-1') 
+        key = key.replace('8', '2').replace('9','1')
+
+        return f'{player}{key}'
+    
+    def clean_string(self, input_string):
+        # Use regex to keep only numbers and negative signs
+        cleaned_string = re.sub(r'[^\d-]', '', input_string)
+        return cleaned_string
+    
+    def clean_dict_keys(self, input_dict):
+        # Create a new dictionary with cleaned keys
+        cleaned_dict = {}
+        keys_to_replace = list(input_dict.keys())
+        total_keys = len(keys_to_replace)
+        for i, value in enumerate(keys_to_replace):
+            cleaned_key = self.clean_string(value)
+            cleaned_dict[cleaned_key] = input_dict[value]
+            # Print progress every 1%
+            if i%1000 == 0:
+                print(f"Progress: {((i + 1) / total_keys) * 100:.2f}%")
+        return cleaned_dict
 
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0:
-            self.executor.submit(self.save_status)
-            self.executor.submit(self._save_model)
+            # self.executor.submit(self.save_status)
+            # self.executor.submit(self._save_model)
+            # execute sync:
+            self.save_status()
 
 
     def _save_model(self):
@@ -128,16 +166,18 @@ class CheckersTraining(CheckersGame):
         print(f"Player 1 score: {self.player1_score}")
         print(f"Player -1 score: {self.player2_score}")
         print(f"Total Games played: {self.total_games}")
+        print("Saving results in a file...")
 
         dst = os.path.join(self.save_directory, f"game_status.json")
         status = {
             'total_games': self.total_games,
-            'valid_moves_memo': list(self.valid_moves_memo.items()),  # Convert to list for JSON
-            'transition_memo': list(self.transition_memo.items()),  # Convert to list for JSON
+            'valid_moves_memo': dict(),  # Convert to list for JSON
+            'transition_memo': dict(),  # Convert to list for JSON
             'monte_carlo_scoring': dict(self.monte_carlo_scoring)
         }
         with open(dst, 'w') as f:
             json.dump(status, f)
+        print(f"Status saved after {self.total_games} games.")
 
 
     def load_status(self):
@@ -159,12 +199,12 @@ class CheckersTraining(CheckersGame):
             new_board = self.board.copy()
             flat_board = self.simulate_play_on_board(new_board, current_move, player)
             flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
-            state = f"{flat_board_with_player}"
+            state = self.clean_string(f"{flat_board_with_player}")
             if state in self.monte_carlo_scoring:
                 score_move_percentage = self.monte_carlo_scoring[state]
             else:
                 score_move_percentage = 0
-            debug_print(f"Predicted: {score_move_percentage} for {flat_board_with_player}")
+            debug_print(f"Predicted: {score_move_percentage} for {state}")
             if best_percentage < score_move_percentage:
                 best_move = current_move
                 best_percentage = score_move_percentage
@@ -183,7 +223,7 @@ class CheckersTraining(CheckersGame):
 
     def update_reward_monte_carlo_score(self, inputs, reward):
         # inputs normally shaped as flat_board_with_player
-        state = f"{inputs}"
+        state = self.clean_string(f"{inputs}")
         reward = reward / 100
         if state in self.monte_carlo_scoring:
             self.monte_carlo_scoring[state]+=reward
@@ -294,17 +334,17 @@ class CheckersTraining(CheckersGame):
             # divided by 2 since update reward is caled twice
             print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
 
-            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}  ({PLAYER_2_ENGINE}) - Tie {self.tie_games}")
+            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}  ({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
             print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
                 self.update_reward_monte_carlo_score(play, reward)
-                self.nn.train(np.array(play), np.array([reward]))
+                # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
             
             reward = self.calculate_reward(-1)
             print(f"Delivering reward for P{-1}: {reward}")
             for play in plays_from_players[-1]:
                 self.update_reward_monte_carlo_score(play, reward)
-                self.nn.train(np.array(play), np.array([reward]))
+                # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
 
             self.save_model_periodically(self.total_games)
 
@@ -317,8 +357,8 @@ class CheckersTraining(CheckersGame):
         print(f"Storing Training Data ...")
         status = {
             'total_games': self.total_games,
-            'valid_moves_memo': list(self.valid_moves_memo.items()),  # Convert to list for JSON
-            'transition_memo': list(self.transition_memo.items()),  # Convert to list for JSON
+            'valid_moves_memo': dict(),  # Convert to list for JSON list(self.valid_moves_memo.items())
+            'transition_memo': dict(),  # Convert to list for JSON list(self.transition_memo.items())
             'monte_carlo_scoring': dict(self.monte_carlo_scoring)
         }
         new_file = os.path.join(self.save_directory,f'{random_name}.json')

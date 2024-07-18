@@ -12,7 +12,6 @@ RANDOM_FIRST_PLAYS = 2 # This activates the random play for a few plays at the s
 PLAYER_1_ENGINE = Engines.MC
 PLAYER_2_ENGINE = Engines.RANDOM # -1
 
-
     
 def debug_print(*args, end=None):
     if DEBUG_ON:
@@ -46,7 +45,7 @@ class CheckersGame:
         self.loop_threshold = 3  # Threshold to detect a loop
         self.recent_boards_limit = 5  # Number of recent boards to track
         self.total_moves = 0  # Counter for the total number of moves
-        self.move_limit = 200  # Hard limit for the total number of moves
+        self.move_limit = 49  # Hard limit for the total number of moves
         self.previous_boards = []  # List to track the last N board states
         self.total_moves += 1
         """

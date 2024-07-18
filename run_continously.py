@@ -12,6 +12,12 @@ ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRE
 try:
     game = CheckersTraining()
     game.run_simulation()
+
+    # game.load_status()
+    # new_dict = game.clean_dict_keys(game.monte_carlo_scoring)
+    # game.monte_carlo_scoring = new_dict
+    # game.save_status()
+
 finally:
     # Restore the original state when done
     ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
