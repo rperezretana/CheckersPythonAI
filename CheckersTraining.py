@@ -19,7 +19,7 @@ class CheckersTraining(CheckersGame):
 
     def __init__(self):
         super().__init__()
-        self.save_interval = 50000 # when NN is not running this has to be a big number
+        self.save_interval = 25000 # when NN is not running this has to be a big number
         self.total_games = 0
         self.tie_detected = False
         self.save_directory = "model_saves"
@@ -163,9 +163,11 @@ class CheckersTraining(CheckersGame):
     def save_status(self):
         print(f"************************************")
         print(f"Total moves: {self.total_moves}")
-        print(f"Player 1 score: {self.player1_score}")
-        print(f"Player -1 score: {self.player2_score}")
+        print(f"Player 1 score: {self.player_1_win_count}")
+        print(f"Player -1 score: {self.player_2_win_count}")
         print(f"Total Games played: {self.total_games}")
+        p1, p2, p3 = self.calculate_percentages(self.player_1_win_count, self.player_2_win_count, self.tie_games)
+        print(f"{p1}% ({PLAYER_1_ENGINE}) - {p2}% ({PLAYER_2_ENGINE}) - {p3}% ties")
         print("Saving results in a file...")
 
         dst = os.path.join(self.save_directory, f"game_status.json")
@@ -200,8 +202,11 @@ class CheckersTraining(CheckersGame):
             flat_board = self.simulate_play_on_board(new_board, current_move, player)
             flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
             state = self.clean_string(f"{flat_board_with_player}")
+            inv_state = self.mirror_play(state)
             if state in self.monte_carlo_scoring:
                 score_move_percentage = self.monte_carlo_scoring[state]
+            elif inv_state in self.monte_carlo_scoring:
+                score_move_percentage = self.monte_carlo_scoring[inv_state]
             else:
                 score_move_percentage = 0
             debug_print(f"Predicted: {score_move_percentage} for {state}")
@@ -221,13 +226,26 @@ class CheckersTraining(CheckersGame):
         return best_move, flat_board_with_player
 
 
+    def calculate_percentages(self, mc_wins, random_wins, ties):
+        total_events = mc_wins + random_wins + ties
+        
+        percentage_mc_wins = (mc_wins / total_events) * 100
+        percentage_random_wins = (random_wins / total_events) * 100
+        percentage_ties = (ties / total_events) * 100
+        
+        return percentage_mc_wins, percentage_random_wins, percentage_ties
+
+
     def update_reward_monte_carlo_score(self, inputs, reward):
         # inputs normally shaped as flat_board_with_player
         state = self.clean_string(f"{inputs}")
         reward = reward / 100
+        inv_state = self.mirror_play(state)
         if state in self.monte_carlo_scoring:
             self.monte_carlo_scoring[state]+=reward
             self.old_branches_updated += 1
+        elif inv_state in self.monte_carlo_scoring:
+            self.monte_carlo_scoring[inv_state]+=reward
         else:
             self.monte_carlo_scoring[state]=reward
             self.new_branches_created += 1
@@ -334,7 +352,8 @@ class CheckersTraining(CheckersGame):
             # divided by 2 since update reward is caled twice
             print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
 
-            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}  ({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
+            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}" \
+                  f"({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
             print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
                 self.update_reward_monte_carlo_score(play, reward)
