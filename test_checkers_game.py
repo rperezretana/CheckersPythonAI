@@ -19,7 +19,7 @@ class TestCheckersGame(unittest.TestCase):
             [0, 3, 0, 3, 0, 3, 0, 3]
         ])
         
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         self.assertEqual(len(valid_moves), 2, "There should be 2 valid move for a single chip one move away from being crowned.")
 
         chosen_move = valid_moves[0]
@@ -43,7 +43,7 @@ class TestCheckersGame(unittest.TestCase):
             [0, 3, 0, 3, 0, 3, 0, 3]
         ])
         
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         self.assertEqual(len(valid_moves), 2, "There should be 2 valid moves for a single chip in a playable position near the middle.")
         
         # Verify the positions of the generated moves
@@ -66,7 +66,7 @@ class TestCheckersGame(unittest.TestCase):
             [0, 3, 0, 3, 0, 3, 0, 3]
         ])
         
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         self.assertEqual(len(valid_moves), 4, "There should be 4 valid moves for a crowned chip in a playable position near the middle.")
         # Verify the positions of the generated moves
         expected_moves = [[(4, 3, 3, 2)], [(4, 3, 3, 4)], [(4, 3, 5, 2)], [(4, 3, 5, 4)]]
@@ -85,7 +85,7 @@ class TestCheckersGame(unittest.TestCase):
             [0, 3, 0, 3, 0, 3, 0, 3] 
         ])
         # Generate valid moves for player 1
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
 
         # Check that there is a capture move
         self.assertEqual(len(valid_moves), 1, "There should be at least one valid move for player 1.")
@@ -118,7 +118,7 @@ class TestCheckersGame(unittest.TestCase):
             [0, 3, 0, 3, 0, 3, 0, 3] 
         ])
         # Generate valid moves for player 1
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
 
         # Check that there is a capture move
         self.assertGreater(len(valid_moves), 0, "There should be at least one valid move for player 1.")
@@ -241,7 +241,7 @@ class TestCheckersGame(unittest.TestCase):
             [3, 0, 3, 0, 3, 0, 3, 0],
             [0, 3, 0, 3, 0, 3, 0, 3]
         ])
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         
         # Ensure there are valid moves
         self.assertGreater(len(valid_moves), 0, "There should be at least one valid move for player 1.")
@@ -272,7 +272,7 @@ class TestCheckersGame(unittest.TestCase):
             [3, 0, 3, 0, 3, 0, 3, 0],    # target positions will be on this row at (6, 1) and (6, 3)
             [0, 3, 0, 3, 0, 3, 0, 3]
         ])
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), -1) # this test the turn is for the -1 player
+        valid_moves = self.game.generate_valid_moves(self.game.board, -1) # this test the turn is for the -1 player
         
         # Ensure there are valid moves
         self.assertEqual(len(valid_moves), 2, "Expects to have 2 Moves for the player -1.")
@@ -309,7 +309,7 @@ class TestCheckersGame(unittest.TestCase):
             [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown
         ])
         
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         
         # Ensure there are valid moves
         self.assertGreater(len(valid_moves), 0, "There should be at least one valid move for player 1.")
@@ -353,7 +353,7 @@ class TestCheckersGame(unittest.TestCase):
             [2, 3, 0, 3, 0, 3, 0, 3]   # (7, 0) player 1 crown
         ])
         
-        valid_moves = self.game.generate_valid_moves(self.game.get_board_state(), 1)
+        valid_moves = self.game.generate_valid_moves(self.game.board, 1)
         
         # Ensure there are valid moves
         self.assertGreater(len(valid_moves), 0, "There should be at least one valid move for player 1.")
@@ -409,6 +409,24 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual("1-10002", self.game.mirror_play("-1-20001"), "error reversing")
         self.assertEqual(result_2, self.game.mirror_play(result_1), "error reversing")
         self.assertEqual(result_1, self.game.mirror_play(result_2), "error reversing")
+
+    def test_remove_zero_values(self):
+        test_cases = [
+            ({'a': 1, 'b': 0, 'c': 3, 'd': 0}, {'a': 1, 'c': 3}, 2),
+            ({'a': 0, 'b': 0, 'c': 0}, {}, 3),
+            ({'a': 1, 'b': 2, 'c': 3}, {'a': 1, 'b': 2, 'c': 3}, 0),
+            ({}, {}, 0)
+        ]
+
+        for i, (input_dict, expected_dict, expected_count) in enumerate(test_cases):
+            print(f"Running test case {i+1}")
+            original_dict = input_dict.copy()
+            self.game.remove_zero_values(input_dict)
+            assert input_dict == expected_dict, f"Test case {i+1} failed: expected {expected_dict} but got {input_dict}"
+            removed_count = len(original_dict) - len(input_dict)
+            assert removed_count == expected_count, f"Test case {i+1} failed: expected {expected_count} removals but got {removed_count}"
+            print(f"Test case {i+1} passed.")
+
 
 
 if __name__ == "__main__":

@@ -99,22 +99,14 @@ class CheckersTraining(CheckersGame):
         flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
         return chosen_move, flat_board_with_player
     
-    def mirror_play(self, key):
-        # Extract the player number and the board configuration
-        # -board = self.clean_string(key) asssumed that it is already mirrored
-        player = 0 
-        if key[0] == '-':
-            player = int(key[0:2])*-1
-            key = key[2:] # remove player from the array
-        else:
-            player = int(key[0])*-1
-            key = key[1:] # remove player from the array
-        key = key.replace('-2', '8').replace('-1', '9') # replace negatives to not deal with signs
-        key = key[::-1] # reverse string
-        key = key.replace('2', '-2').replace('1', '-1') 
-        key = key.replace('8', '2').replace('9','1')
 
+    def mirror_play(self, key):
+        player = int(key[:2]) * -1 if key[0] == '-' else int(key[0]) * -1
+        key = key[2:] if key[0] == '-' else key[1:]
+        key = key.replace('-2', '8').replace('-1', '9')[::-1]
+        key = key.replace('2', '-2').replace('1', '-1').replace('8', '2').replace('9', '1')
         return f'{player}{key}'
+
     
     def clean_string(self, input_string):
         # Use regex to keep only numbers and negative signs
@@ -136,6 +128,8 @@ class CheckersTraining(CheckersGame):
 
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0:
+            # async saaving was disabled to allow me to stop the
+            # training proccess without damaging the file. It can be enabled later
             # self.executor.submit(self.save_status)
             # self.executor.submit(self._save_model)
             # execute sync:
@@ -169,6 +163,7 @@ class CheckersTraining(CheckersGame):
         p1, p2, p3 = self.calculate_percentages(self.player_1_win_count, self.player_2_win_count, self.tie_games)
         print(f"{p1}% ({PLAYER_1_ENGINE}) - {p2}% ({PLAYER_2_ENGINE}) - {p3}% ties")
         print("Saving results in a file...")
+        self.remove_zero_values(self.monte_carlo_scoring)
 
         dst = os.path.join(self.save_directory, f"game_status.json")
         status = {
@@ -364,16 +359,21 @@ class CheckersTraining(CheckersGame):
             for play in plays_from_players[-1]:
                 self.update_reward_monte_carlo_score(play, reward)
                 # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
-
             self.save_model_periodically(self.total_games)
 
-
+    def remove_zero_values(self, input_dict):
+        print(f"Removing 0 values...")
+        keys_to_remove = [key for key, value in input_dict.items() if value == 0]
+        for key in keys_to_remove:
+            del input_dict[key]
+        print(f'Removed {len(keys_to_remove)} keys.')
 
     
     def save_game_results(self):
         # Generate a random 5 characters string
         random_name = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
         print(f"Storing Training Data ...")
+        self.remove_zero_values(self.monte_carlo_scoring)
         status = {
             'total_games': self.total_games,
             'valid_moves_memo': dict(),  # Convert to list for JSON list(self.valid_moves_memo.items())
