@@ -3,7 +3,9 @@ import random
 import time
 import numpy as np
 import os
-from CheckersGame import PLAYER_1_ENGINE, PLAYER_2_ENGINE, RANDOM_FIRST_PLAYS, CheckersGame, Engines, debug_print, DEBUG_ON, RANDOM_FIRST_PLAYS
+from CheckersRulesGame import CheckersRulesGame
+from Enumerators import Engines
+from SimpleConfig import PLAYER_1_ENGINE, PLAYER_2_ENGINE, RANDOM_FIRST_PLAYS, debug_print, DEBUG_ON, RANDOM_FIRST_PLAYS
 from CheckersNN import CheckersNN
 import tensorflow as tf
 import json
@@ -15,7 +17,7 @@ import re
 
 tf.compat.v1.enable_eager_execution()
 
-class CheckersTraining(CheckersGame):
+class CheckersTraining(CheckersRulesGame):
 
     def __init__(self):
         super().__init__()
