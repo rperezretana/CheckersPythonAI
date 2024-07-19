@@ -380,6 +380,9 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual(self.game.player2_score, 11, "Player -1's score should be updated to reflect the remaining pieces.")
 
     def test_key_generator(self):
+        """
+        This test key generator actually converts the board in to a string, and returns also a mirror key
+        """
         board_1 = np.array([
             [3, 2, 3, 1, 3, 0, 3, 0],
             [-1, 3, -2, 3, 0, 3, 0, 3],
@@ -411,6 +414,9 @@ class TestCheckersGame(unittest.TestCase):
         self.assertEqual(result_1, self.game.mirror_play(result_2), "error reversing")
 
     def test_remove_zero_values(self):
+        """
+        This test that remove_zero_values works by removing values from a dictionary that are equals to 0
+        """
         test_cases = [
             ({'a': 1, 'b': 0, 'c': 3, 'd': 0}, {'a': 1, 'c': 3}, 2),
             ({'a': 0, 'b': 0, 'c': 0}, {}, 3),
@@ -419,13 +425,11 @@ class TestCheckersGame(unittest.TestCase):
         ]
 
         for i, (input_dict, expected_dict, expected_count) in enumerate(test_cases):
-            print(f"Running test case {i+1}")
             original_dict = input_dict.copy()
             self.game.remove_zero_values(input_dict)
             assert input_dict == expected_dict, f"Test case {i+1} failed: expected {expected_dict} but got {input_dict}"
             removed_count = len(original_dict) - len(input_dict)
             assert removed_count == expected_count, f"Test case {i+1} failed: expected {expected_count} removals but got {removed_count}"
-            print(f"Test case {i+1} passed.")
 
 
 
