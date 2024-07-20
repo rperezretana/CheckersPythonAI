@@ -17,6 +17,10 @@ I was just curious to play with NN again and trying to keep refreshign some conc
 
 The back up of the montecarlo models and the NN are not included because they became huge after millions of iterations, but I used this project to train them, so should be matter of a few weeks running it continously to get them. Also it uses a lot of memory since my computer have a couple of hundred gigs of ram, this might not run well on smaller computers.
 
+![image](https://github.com/user-attachments/assets/caeba969-9028-449a-988e-d6de1e331f1e)
+
+
+
 ![image](https://github.com/user-attachments/assets/9a08a5c7-ef96-4222-8df8-393709b2d72e)
 
 
