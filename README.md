@@ -6,11 +6,12 @@
 Checkers AI: Neural Network and Monte Carlo Simulation
 This project showcases an AI for playing checkers, leveraging both Neural Network and Monte Carlo Simulation techniques. The AI has been trained through millions of games and consistently wins over 70% of matches against random movement engines, demonstrating its basic strategic capabilities.
 
-Features:
-Neural Network: Trained using TensorFlow to predict optimal moves based on game state.
-Monte Carlo Simulation: Efficiently evaluates potential future moves for enhanced decision-making.
-Async Save and Load: Ensures robust training with safe, asynchronous model saving.
-Dynamic Learning: Adapts strategies over continuous gameplay to improve performance.
+## Features:
+
+**Neural Network**: Trained using TensorFlow to predict optimal moves based on game state.
+**Monte Carlo Simulation**: Efficiently evaluates potential future moves for enhanced decision-making.
+**Async Save and Load**: Ensures robust and fast training with safe, asynchronous model saving. The learning proccess is not interrupted by saving to a file, unless configured.
+**Dynamic Learning:** Adapts strategies over continuous gameplay to improve performance.
 Why This Project?
 I was just curious to play with NN again and trying to keep refreshign some concepts, and learning a few new ones in the meantime.
 
