@@ -11,6 +11,7 @@ from SimpleConfig import (
     PLAYER_1_ENGINE,
     PLAYER_2_ENGINE,
     RANDOM_FIRST_PLAYS,
+    TRAINING,
     debug_print,
     DEBUG_ON,
     RANDOM_FIRST_PLAYS,
@@ -381,13 +382,15 @@ class CheckersTraining(CheckersRulesGame):
             debug_print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
                 self.update_reward_monte_carlo_score(play, reward)
-                # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
+                if TRAINING:
+                    self.nn.train(np.array(play), np.array([reward]))
             
             reward = self.calculate_reward(-1)
             debug_print(f"Delivering reward for P{-1}: {reward}")
             for play in plays_from_players[-1]:
                 self.update_reward_monte_carlo_score(play, reward)
-                # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
+                if TRAINING:
+                    self.nn.train(np.array(play), np.array([reward]))
             self.save_model_periodically(self.total_games)
 
     def remove_zero_values(self, input_dict):
