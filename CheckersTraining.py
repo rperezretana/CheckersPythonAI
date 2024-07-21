@@ -5,13 +5,22 @@ import numpy as np
 import os
 from CheckersRulesGame import CheckersRulesGame
 from Enumerators import Engines
-from SimpleConfig import PLAYER_1_ENGINE, PLAYER_2_ENGINE, RANDOM_FIRST_PLAYS, debug_print, DEBUG_ON, RANDOM_FIRST_PLAYS
+from MathTooling import base4_to_base72, clean_string, transform_dict_keys_base4_to_base72, transform_key_to_base72, transform_key_to_base_4
+from SimpleConfig import (
+    EXECUTE_SAVE_ASYNC,
+    PLAYER_1_ENGINE,
+    PLAYER_2_ENGINE,
+    RANDOM_FIRST_PLAYS,
+    debug_print,
+    DEBUG_ON,
+    RANDOM_FIRST_PLAYS,
+    SAVES_INTERVAL
+)
 from CheckersNN import CheckersNN
 import tensorflow as tf
 import json
 from concurrent.futures import ThreadPoolExecutor
 import string
-import re
 
 
 
@@ -21,7 +30,7 @@ class CheckersTraining(CheckersRulesGame):
 
     def __init__(self):
         super().__init__()
-        self.save_interval = 25000 # when NN is not running this has to be a big number
+        self.save_interval = SAVES_INTERVAL # when NN is not running this has to be a big number
         self.total_games = 0
         self.tie_detected = False
         self.save_directory = "model_saves"
@@ -30,7 +39,10 @@ class CheckersTraining(CheckersRulesGame):
         if not os.path.exists(self.save_directory):
             os.makedirs(self.save_directory)
         self.nn = CheckersNN()  # Initialize neural network
-        self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
+        # load NN model if exist and if it is going to be used:
+        if Engines.NN in [PLAYER_1_ENGINE, PLAYER_2_ENGINE] and\
+            os.path.exists(os.path.join(self.save_directory,'checkers_model.h5')):
+            self.nn.load(os.path.join(self.save_directory, "checkers_model.h5"))
         self.monte_carlo_scoring = dict()
         self.executor = ThreadPoolExecutor(max_workers=1)  # Create an executor for asynchronous tasks
         self.player_1_win_count = 0
@@ -38,6 +50,7 @@ class CheckersTraining(CheckersRulesGame):
         self.tie_games = 0
         self.new_branches_created = 0
         self.old_branches_updated = 0
+        self.loop_run = True
 
 
     def simulate_play_on_board(self, board, move, player):
@@ -79,7 +92,6 @@ class CheckersTraining(CheckersRulesGame):
             flat_board = self.simulate_play_on_board(new_board, current_move, player)
             flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
             score_move_percentage = self.nn.predict(flat_board_with_player)[0][0]
-            debug_print(f"Predicted: {score_move_percentage} for {flat_board_with_player}")
             if best_percentage < score_move_percentage:
                 best_move = current_move
                 best_percentage = score_move_percentage
@@ -110,18 +122,13 @@ class CheckersTraining(CheckersRulesGame):
         return f'{player}{key}'
 
     
-    def clean_string(self, input_string):
-        # Use regex to keep only numbers and negative signs
-        cleaned_string = re.sub(r'[^\d-]', '', input_string)
-        return cleaned_string
-    
     def clean_dict_keys(self, input_dict):
         # Create a new dictionary with cleaned keys
         cleaned_dict = {}
         keys_to_replace = list(input_dict.keys())
         total_keys = len(keys_to_replace)
         for i, value in enumerate(keys_to_replace):
-            cleaned_key = self.clean_string(value)
+            cleaned_key = clean_string(value)
             cleaned_dict[cleaned_key] = input_dict[value]
             # Print progress every 1%
             if i%1000 == 0:
@@ -130,12 +137,13 @@ class CheckersTraining(CheckersRulesGame):
 
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0:
-            # async saaving was disabled to allow me to stop the
-            # training proccess without damaging the file. It can be enabled later
-            # self.executor.submit(self.save_status)
-            # self.executor.submit(self._save_model)
-            # execute sync:
-            self.save_status()
+            if EXECUTE_SAVE_ASYNC:
+                print("Saving file executing async")
+                self.executor.submit(self.save_status)
+                self.executor.submit(self._save_model)
+            else:
+                # execute sync:
+                self.save_status()
 
 
     def _save_model(self):
@@ -167,6 +175,13 @@ class CheckersTraining(CheckersRulesGame):
         print("Saving results in a file...")
         self.remove_zero_values(self.monte_carlo_scoring)
 
+        src = os.path.join(self.save_directory, f"game_status.json")
+        dst = os.path.join(self.save_directory, f"game_status2.json")
+        if os.path.exists(dst):
+            os.remove(os.path.join(self.save_directory,'game_status2.json'))
+        if os.path.exists(src):
+            os.rename(src, dst)
+
         dst = os.path.join(self.save_directory, f"game_status.json")
         status = {
             'total_games': self.total_games,
@@ -177,6 +192,10 @@ class CheckersTraining(CheckersRulesGame):
         with open(dst, 'w') as f:
             json.dump(status, f)
         print(f"Status saved after {self.total_games} games.")
+        self.check_and_delete_stop_file()
+        # clear some memmory once in a while:
+        self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
+        self.transition_memo = {}  # Memo dictionary for is_valid_transition
 
 
     def load_status(self):
@@ -198,8 +217,10 @@ class CheckersTraining(CheckersRulesGame):
             new_board = self.board.copy()
             flat_board = self.simulate_play_on_board(new_board, current_move, player)
             flat_board_with_player = self.filter_and_flatten_board(flat_board, player)
-            state = self.clean_string(f"{flat_board_with_player}")
-            inv_state = self.mirror_play(state)
+            state = clean_string(f"{flat_board_with_player}")
+            inv_state = transform_key_to_base72(self.mirror_play(state))
+            state = transform_key_to_base72(state)
+            
             if state in self.monte_carlo_scoring:
                 score_move_percentage = self.monte_carlo_scoring[state]
             elif inv_state in self.monte_carlo_scoring:
@@ -225,6 +246,8 @@ class CheckersTraining(CheckersRulesGame):
 
     def calculate_percentages(self, mc_wins, random_wins, ties):
         total_events = mc_wins + random_wins + ties
+        if total_events == 0:
+            return 0, 0, 0
         
         percentage_mc_wins = (mc_wins / total_events) * 100
         percentage_random_wins = (random_wins / total_events) * 100
@@ -235,9 +258,12 @@ class CheckersTraining(CheckersRulesGame):
 
     def update_reward_monte_carlo_score(self, inputs, reward):
         # inputs normally shaped as flat_board_with_player
-        state = self.clean_string(f"{inputs}")
+        state = clean_string(f"{inputs}")
         reward = reward / 100
         inv_state = self.mirror_play(state)
+        
+        state = transform_key_to_base72(state)
+        inv_state = transform_key_to_base72(inv_state)
         if state in self.monte_carlo_scoring:
             self.monte_carlo_scoring[state]+=reward
             self.old_branches_updated += 1
@@ -274,7 +300,7 @@ class CheckersTraining(CheckersRulesGame):
         self.player_1_score = 0
         self.player_2_score = 0
         self.tie_games = 0
-        while True:
+        while self.loop_run:
             self.new_branches_created = 0
             self.old_branches_updated = 0
             self.board = self.initialize_board()
@@ -346,18 +372,19 @@ class CheckersTraining(CheckersRulesGame):
             else:
                 self.tie_games += 1
 
-            # divided by 2 since update reward is caled twice
-            print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
-
-            print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}" \
-                  f"({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
-            print(f"Delivering reward for P{1}: {reward}")
+            if self.total_games % 15000 == 0:
+                print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
+                print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}" \
+                    f"({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
+                p1, p2, p3 = self.calculate_percentages(self.player_1_win_count, self.player_2_win_count, self.tie_games)
+                print(f"{p1}% ({PLAYER_1_ENGINE}) - {p2}% ({PLAYER_2_ENGINE}) - {p3}% ties")
+            debug_print(f"Delivering reward for P{1}: {reward}")
             for play in plays_from_players[1]:
                 self.update_reward_monte_carlo_score(play, reward)
                 # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
             
             reward = self.calculate_reward(-1)
-            print(f"Delivering reward for P{-1}: {reward}")
+            debug_print(f"Delivering reward for P{-1}: {reward}")
             for play in plays_from_players[-1]:
                 self.update_reward_monte_carlo_score(play, reward)
                 # self.nn.train(np.array(play), np.array([reward])) temporarily pause NN training
@@ -385,6 +412,17 @@ class CheckersTraining(CheckersRulesGame):
         new_file = os.path.join(self.save_directory,f'{random_name}.json')
         with open(new_file, 'w') as f:
             json.dump(status, f)
+
+
+    def check_and_delete_stop_file(self):
+        """
+        This helps to stop the program and garantee no damage to the files.
+        Create a file stop.txt to stop the program and it will stop next time the back up finish.
+        """
+        stop_file_path = os.path.join(self.save_directory, 'stop.txt')
+        if os.path.exists(stop_file_path):
+            os.remove(stop_file_path)
+            self.loop_run = False
 
 
 if __name__ == "__main__":

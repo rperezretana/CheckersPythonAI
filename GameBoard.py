@@ -164,7 +164,7 @@ class GameBoard():
     def detect_loop(self):
         """
         Detect if a loop is occurring in the game by checking if the same board state 
-        has been repeated in the last few moves.
+        has been repeated in the last few moves. This discourage stalemates
         
         Returns:
         bool: True if a loop is detected, False otherwise.

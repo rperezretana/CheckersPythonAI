@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from CheckersTraining import CheckersTraining
+from MathTooling import transform_dict_keys_base4_to_base72
 
 class TestCheckersGame(unittest.TestCase):
     def setUp(self):
@@ -432,6 +433,21 @@ class TestCheckersGame(unittest.TestCase):
             assert removed_count == expected_count, f"Test case {i+1} failed: expected {expected_count} removals but got {removed_count}"
 
 
+    def test_tooling__base5_to_base64(self):
+        input_dict = {
+            "123": 1,
+            "321": 2,
+            "132": 3,
+            "44444444444444444444444444444444": 4
+        }
+        expected_output = {
+            "R": 1,   # 123 in base 4 is R in base 72 with the new alphabet
+            "v": 2,   # 321 in base 4 is v in base 72 with the new alphabet
+            "U": 3,   # 132 in base 4 is U in base 72 with the new alphabet
+            "6f0RRvISrg&": 4  # 44444444444444444444444444444444 in base 4 is 6f0RRvISrg& in base 72 with the new alphabet
+        }
+        result = transform_dict_keys_base4_to_base72(input_dict)
+        self.assertEqual(result, expected_output)
 
 if __name__ == "__main__":
     unittest.main()
