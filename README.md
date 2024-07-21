@@ -10,12 +10,14 @@ This project showcases an AI for playing checkers, leveraging both Neural Networ
 
 **Neural Network**: Trained using TensorFlow to predict optimal moves based on game state.
 **Monte Carlo Simulation**: Efficiently evaluates potential future moves for enhanced decision-making.
-**Async Save and Load**: Ensures robust and fast training with safe, asynchronous model saving. The learning proccess is not interrupted by saving to a file, unless configured.
+**Async Save and Load**: Ensures robust and fast training with safe, asynchronous model saving. The learning process is not interrupted by saving to a file, unless configured.
 **Dynamic Learning:** Adapts strategies over continuous gameplay to improve performance.
-Why This Project?
+
+
+## Why This Project?
 I was just curious to play with NN again and trying to keep refreshign some concepts, and learning a few new ones in the meantime.
 
-The back up of the montecarlo models and the NN are not included because they became huge after millions of iterations, but I used this project to train them, so should be matter of a few weeks running it continously to get them. Also it uses a lot of memory since my computer have a couple of hundred gigs of ram, this might not run well on smaller computers.
+The backup of the Montecarlo models and the NN are not included because they became huge after millions of iterations, but I used this project to train them, so it should be a matter of a few weeks running it continuously to get them. Also, it uses a lot of memory since my computer has a couple of hundred gigs of RAM, this might not run well on smaller computers.
 
 ![image](https://github.com/user-attachments/assets/caeba969-9028-449a-988e-d6de1e331f1e)
 
