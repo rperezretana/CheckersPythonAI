@@ -26,7 +26,7 @@ class GameBoard():
         self.loop_threshold = 3  # Threshold to detect a loop
         self.recent_boards_limit = 5  # Number of recent boards to track
         self.total_moves = 0  # Counter for the total number of moves
-        self.move_limit = 100  # Hard limit for the total number of moves
+        self.move_limit = 60  # Hard limit for the total number of moves
         self.previous_boards = []  # List to track the last N board states
         self.total_moves += 1
         """

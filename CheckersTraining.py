@@ -5,12 +5,13 @@ import numpy as np
 import os
 from CheckersRulesGame import CheckersRulesGame
 from Enumerators import Engines
-from MathTooling import base4_to_base72, clean_string, transform_dict_keys_base4_to_base72, transform_key_to_base72, transform_key_to_base_4
+from MathTooling import average, clean_string, transform_key_to_base72
 from SimpleConfig import (
     EXECUTE_SAVE_ASYNC,
     PLAYER_1_ENGINE,
     PLAYER_2_ENGINE,
     RANDOM_FIRST_PLAYS,
+    STOP_CHECK_INTERVAL,
     TRAINING,
     debug_print,
     DEBUG_ON,
@@ -51,6 +52,7 @@ class CheckersTraining(CheckersRulesGame):
         self.tie_games = 0
         self.new_branches_created = 0
         self.old_branches_updated = 0
+        self.inverted_branches_used = 0
         self.loop_run = True
 
 
@@ -137,15 +139,20 @@ class CheckersTraining(CheckersRulesGame):
         return cleaned_dict
 
     def save_model_periodically(self, game_count):
-        if game_count % self.save_interval == 0:
+        if game_count % self.save_interval == 0 or self.loop_run == False:
             if EXECUTE_SAVE_ASYNC:
                 print("Saving file executing async")
-                self.executor.submit(self.save_status)
-                self.executor.submit(self._save_model)
+                future = self.executor.submit(self.save_status)
+                future.add_done_callback(self.save_callback)
             else:
                 # execute sync:
                 self.save_status()
 
+    def save_callback(self, future):
+        try:
+            future.result()
+        except Exception as e:
+            print(f"Error occurred during save: {e}")
 
     def _save_model(self):
         # Rotate the saved models
@@ -193,10 +200,11 @@ class CheckersTraining(CheckersRulesGame):
         with open(dst, 'w') as f:
             json.dump(status, f)
         print(f"Status saved after {self.total_games} games.")
-        self.check_and_delete_stop_file()
         # clear some memmory once in a while:
         self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
         self.transition_memo = {}  # Memo dictionary for is_valid_transition
+        if TRAINING:
+            self._save_model()
 
 
     def load_status(self):
@@ -260,16 +268,16 @@ class CheckersTraining(CheckersRulesGame):
     def update_reward_monte_carlo_score(self, inputs, reward):
         # inputs normally shaped as flat_board_with_player
         state = clean_string(f"{inputs}")
-        reward = reward / 100
         inv_state = self.mirror_play(state)
-        
+        # reward = reward / 100
         state = transform_key_to_base72(state)
         inv_state = transform_key_to_base72(inv_state)
         if state in self.monte_carlo_scoring:
-            self.monte_carlo_scoring[state]+=reward
+            self.monte_carlo_scoring[state] = average(reward, self.monte_carlo_scoring[state])
             self.old_branches_updated += 1
         elif inv_state in self.monte_carlo_scoring:
-            self.monte_carlo_scoring[inv_state]+=reward
+            self.monte_carlo_scoring[inv_state] = average(reward, self.monte_carlo_scoring[inv_state])
+            self.inverted_branches_used += 1
         else:
             self.monte_carlo_scoring[state]=reward
             self.new_branches_created += 1
@@ -301,97 +309,107 @@ class CheckersTraining(CheckersRulesGame):
         self.player_1_score = 0
         self.player_2_score = 0
         self.tie_games = 0
-        while self.loop_run:
-            self.new_branches_created = 0
-            self.old_branches_updated = 0
-            self.board = self.initialize_board()
-            plays_from_players = {
-                1: [],
-                -1: []
-            }
-            self.total_games += 1
-            player = random.choice([1, -1]) # Start with random player
-            debug_print("Current Board:")
-            self.print_board()  # Print the board for debugging
-            self.tie_detected = False
-            while True:
-                valid_moves = self.generate_valid_moves(self.board, player)
-                if not valid_moves:
-                    break
+        try:
+            while self.loop_run:
+                self.new_branches_created = 0
+                self.old_branches_updated = 0
+                self.inverted_branches_used = 0
+                self.board = self.initialize_board()
+                plays_from_players = {
+                    1: [],
+                    -1: []
+                }
+                self.total_games += 1
+                player = random.choice([1, -1]) # Start with random player
+                debug_print("Current Board:")
+                self.print_board()  # Print the board for debugging
+                self.tie_detected = False
+                while True:
+                    valid_moves = self.generate_valid_moves(self.board, player)
+                    if not valid_moves:
+                        break
 
-                chosen_move, flat_board_with_player =  self.play_with_selected_engine(valid_moves, player)
-                if not chosen_move:
-                    raise ("There is a problem, no move was chosen.")
-                
-                plays_from_players[player].append(flat_board_with_player)
-                self.update_score_and_board(chosen_move, player)
+                    chosen_move, flat_board_with_player =  self.play_with_selected_engine(valid_moves, player)
+                    if not chosen_move:
+                        raise ("There is a problem, no move was chosen.")
+                    
+                    plays_from_players[player].append(flat_board_with_player)
+                    self.update_score_and_board(chosen_move, player)
 
-                self.update_reward_monte_carlo_score(flat_board_with_player, self.calculate_reward(player))
-                
-                if self.detect_loop():
-                    self.tie_detected = True
-                    debug_print("Loop detected. Game ends in a tie.")
-                    debug_print(f"Total moves: {self.total_moves}")
-                    break
+                    self.update_reward_monte_carlo_score(flat_board_with_player, self.calculate_reward(player))
+                    
+                    if self.detect_loop():
+                        self.tie_detected = True
+                        debug_print("Loop detected. Game ends in a tie.")
+                        debug_print(f"Total moves: {self.total_moves}")
+                        break
 
-                if DEBUG_ON:
-                    self.print_board()
-                    debug_print(f"Player 1 score: {self.player1_score} ({PLAYER_1_ENGINE})")
-                    debug_print(f"Player -1 score: {self.player2_score} ({PLAYER_2_ENGINE})")
-                    debug_print(f"Total moves: {self.total_moves}")
-                    debug_print(f"Total Games played: {self.total_games}")
-                    self.update_game_scores()
-                    time.sleep(1)
+                    if DEBUG_ON:
+                        self.print_board()
+                        debug_print(f"Player 1 score: {self.player1_score} ({PLAYER_1_ENGINE})")
+                        debug_print(f"Player -1 score: {self.player2_score} ({PLAYER_2_ENGINE})")
+                        debug_print(f"Total moves: {self.total_moves}")
+                        debug_print(f"Total Games played: {self.total_games}")
+                        self.update_game_scores()
+                        time.sleep(1)
 
-                if player == 1:
-                    self.player1_moves += 1
+                    if player == 1:
+                        self.player1_moves += 1
+                    else:
+                        self.player2_moves += 1
+
+                    player = -player  # reverse player playing
+
+                    self.total_moves += 1
+                    if self.total_moves >= self.move_limit:
+                        # self.tie_detected = True
+                        debug_print("Move limit reached. Game ends in a tie.")
+                        debug_print(f"Total moves: {self.total_moves}")
+                        break
+
+
+                self.update_game_scores()
+                debug_print(f"Player {player} has no valid moves. Game over.")
+                debug_print(f"Player 1 moves: {self.player1_moves}")
+                debug_print(f"Player -1 moves: {self.player2_moves}")
+                debug_print(f"Player 1 score: {self.player1_score}")
+                debug_print(f"Player -1 score: {self.player2_score}")
+
+                reward = self.calculate_reward(1)
+                if self.player1_score > self.player2_score:
+                    self.player_1_win_count += 1
+                elif self.player1_score < self.player2_score:
+                    self.player_2_win_count += 1
                 else:
-                    self.player2_moves += 1
+                    self.tie_games += 1
 
-                player = -player  # reverse player playing
+                debug_print(f"Delivering reward for P{1}: {reward}")
+                for play in plays_from_players[1]:
+                    self.update_reward_monte_carlo_score(play, reward)
+                    if TRAINING:
+                        self.nn.train(np.array(play), np.array([reward]))
+                
+                reward = self.calculate_reward(-1)
+                debug_print(f"Delivering reward for P{-1}: {reward}")
+                for play in plays_from_players[-1]:
+                    self.update_reward_monte_carlo_score(play, reward)
+                    if TRAINING:
+                        self.nn.train(np.array(play), np.array([reward]))
+                self.save_model_periodically(self.total_games) # periodically
+                if self.total_games % STOP_CHECK_INTERVAL == 0:
+                    print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated} - Mirror used {self.inverted_branches_used}")
+                    print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}" \
+                        f"({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
+                    p1, p2, p3 = self.calculate_percentages(self.player_1_win_count, self.player_2_win_count, self.tie_games)
+                    print(f"{p1}% ({PLAYER_1_ENGINE}) - {p2}% ({PLAYER_2_ENGINE}) - {p3}% ties")
+                    if self.check_and_delete_stop_file():
+                        break
+            print("Preparing to stop the application...")
+            self.save_model_periodically(self.total_games) # end of game loop, game is stopping
+        finally:
+            self.shutdown_executor()  # Ensure the executor is shut down before exiting
 
-                self.total_moves += 1
-                if self.total_moves >= self.move_limit:
-                    # self.tie_detected = True
-                    debug_print("Move limit reached. Game ends in a tie.")
-                    debug_print(f"Total moves: {self.total_moves}")
-                    break
 
-
-            self.update_game_scores()
-            debug_print(f"Player {player} has no valid moves. Game over.")
-            debug_print(f"Player 1 moves: {self.player1_moves}")
-            debug_print(f"Player -1 moves: {self.player2_moves}")
-            debug_print(f"Player 1 score: {self.player1_score}")
-            debug_print(f"Player -1 score: {self.player2_score}")
-
-            reward = self.calculate_reward(1)
-            if self.player1_score > self.player2_score:
-                self.player_1_win_count += 1
-            elif self.player1_score < self.player2_score:
-                self.player_2_win_count += 1
-            else:
-                self.tie_games += 1
-
-            if self.total_games % 15000 == 0:
-                print(f"MC new branches: {self.new_branches_created} - Old Branches {self.old_branches_updated}")
-                print(f"Global score: P1: {self.player_1_win_count}  ({PLAYER_1_ENGINE}) P-1: {self.player_2_win_count}" \
-                    f"({PLAYER_2_ENGINE}) - Tie {self.tie_games} - MC:{len(self.monte_carlo_scoring)}")
-                p1, p2, p3 = self.calculate_percentages(self.player_1_win_count, self.player_2_win_count, self.tie_games)
-                print(f"{p1}% ({PLAYER_1_ENGINE}) - {p2}% ({PLAYER_2_ENGINE}) - {p3}% ties")
-            debug_print(f"Delivering reward for P{1}: {reward}")
-            for play in plays_from_players[1]:
-                self.update_reward_monte_carlo_score(play, reward)
-                if TRAINING:
-                    self.nn.train(np.array(play), np.array([reward]))
-            
-            reward = self.calculate_reward(-1)
-            debug_print(f"Delivering reward for P{-1}: {reward}")
-            for play in plays_from_players[-1]:
-                self.update_reward_monte_carlo_score(play, reward)
-                if TRAINING:
-                    self.nn.train(np.array(play), np.array([reward]))
-            self.save_model_periodically(self.total_games)
 
     def remove_zero_values(self, input_dict):
         print(f"Removing 0 values...")
@@ -424,9 +442,16 @@ class CheckersTraining(CheckersRulesGame):
         """
         stop_file_path = os.path.join(self.save_directory, 'stop.txt')
         if os.path.exists(stop_file_path):
+            print("REQUEST TO STOP DETECTED.")
             os.remove(stop_file_path)
             self.loop_run = False
+            return True
+        return False
 
+    def shutdown_executor(self):
+        print("Executor still running, waiting for it to complete")
+        self.executor.shutdown(wait=True)
+        print("Executor shutdown complete")
 
 if __name__ == "__main__":
     game = CheckersTraining()

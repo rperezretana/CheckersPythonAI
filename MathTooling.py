@@ -1,5 +1,7 @@
 import re
 
+def average(a, b):
+    return (a + b) / 2
 
 def base4_to_decimal(base4_num_str):
     """Convert a base 4 number (as a string) to a decimal number."""
