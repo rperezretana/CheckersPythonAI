@@ -6,7 +6,7 @@
 Checkers AI: Neural Network and Monte Carlo Simulation
 This project showcases an AI for playing checkers, leveraging both Neural Network and Monte Carlo Simulation techniques. The AI has been trained through hundreds of millions of games and consistently wins over 85% of matches against random movement engines, demonstrating its basic strategic capabilities.
 
-This project also challenged multiple other skills, such as, trying to keep the model in a small size to fit in 200GB of ram, and a small file to store the model. Using multiple techniques for encryption.
+This project also challenged multiple other skills, such as, trying to keep the model in a small size to fit in 200GB of ram, and a small file to store the model. Using multiple techniques for encryption of the Montecarlo model.
 
 ## Features:
 
