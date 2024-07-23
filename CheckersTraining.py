@@ -140,6 +140,7 @@ class CheckersTraining(CheckersRulesGame):
 
     def save_model_periodically(self, game_count):
         if game_count % self.save_interval == 0 or self.loop_run == False:
+            self.reduce_cache_size()
             if EXECUTE_SAVE_ASYNC:
                 print("Saving file executing async")
                 future = self.executor.submit(self.save_status)
@@ -200,11 +201,13 @@ class CheckersTraining(CheckersRulesGame):
         with open(dst, 'w') as f:
             json.dump(status, f)
         print(f"Status saved after {self.total_games} games.")
-        # clear some memmory once in a while:
-        self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
-        self.transition_memo = {}  # Memo dictionary for is_valid_transition
         if TRAINING:
             self._save_model()
+
+
+    def reduce_cache_size(self):
+        self.valid_moves_memo.remove_least_used()
+        self.transition_memo.remove_least_used()
 
 
     def load_status(self):
@@ -213,8 +216,6 @@ class CheckersTraining(CheckersRulesGame):
             with open(src, 'r') as f:
                 status = json.load(f)
                 self.total_games = status.get('total_games', 0)
-                self.valid_moves_memo = dict(status.get('valid_moves_memo', []))
-                self.transition_memo = dict(status.get('transition_memo', []))
                 self.monte_carlo_scoring =  dict(status.get('monte_carlo_scoring', []))
 
 
@@ -426,8 +427,6 @@ class CheckersTraining(CheckersRulesGame):
         self.remove_zero_values(self.monte_carlo_scoring)
         status = {
             'total_games': self.total_games,
-            'valid_moves_memo': dict(),  # Convert to list for JSON list(self.valid_moves_memo.items())
-            'transition_memo': dict(),  # Convert to list for JSON list(self.transition_memo.items())
             'monte_carlo_scoring': dict(self.monte_carlo_scoring)
         }
         new_file = os.path.join(self.save_directory,f'{random_name}.json')

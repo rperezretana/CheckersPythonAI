@@ -1,10 +1,11 @@
 import numpy as np
 from SimpleConfig import debug_print 
+from CustomMemo import Memo
 
 class GameBoard():
     def __init__(self):
-        self.valid_moves_memo = {}  # Memo dictionary for generate_valid_moves
-        self.transition_memo = {}  # Memo dictionary for is_valid_transition
+        self.valid_moves_memo = Memo()  # Memo dictionary for generate_valid_moves
+        self.transition_memo = Memo()  # Memo dictionary for is_valid_transition
         # Define the initial checkers board setup
         self.blank_board = np.zeros((8, 8), dtype=int)
         # Mark non-playable tiles with 3
