@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from CheckersTraining import CheckersTraining
-from MathTooling import transform_dict_keys_base4_to_base72
+from MathTooling import transform_dict_keys_base4_to_base72, clean_string
 
 class TestCheckersGame(unittest.TestCase):
     def setUp(self):
@@ -406,8 +406,8 @@ class TestCheckersGame(unittest.TestCase):
         ])
         result_1 = f"{self.game.filter_and_flatten_board(board_1, 1)}"
         result_2 = f"{self.game.filter_and_flatten_board(board_mirrored, -1)}"
-        result_1 = self.game.clean_string(result_1)
-        result_2 = self.game.clean_string(result_2)
+        result_1 = clean_string(result_1)
+        result_2 = clean_string(result_2)
         
         self.assertEqual("-1-20001", self.game.mirror_play("1-10002"), "error reversing")
         self.assertEqual("1-10002", self.game.mirror_play("-1-20001"), "error reversing")
